@@ -1,0 +1,103 @@
+# **Argo CD Architecture**
+
+## **Overview**
+
+Argo CD is a declarative, GitOps continuous delivery tool for Kubernetes. Once installed in a Kubernetes cluster, all its components run as pods. The architecture of Argo CD is composed of several core components that work together to synchronize the desired application state (stored in Git) with the actual state running in the cluster.
+
+---
+
+## **Core Components**
+
+### **1. Argo CD Server**
+
+The **Argo CD Server** is the main entry point for users and external systems. It provides both an **API server** and a **web-based user interface**.
+
+#### **Responsibilities**
+
+* Exposes APIs for application management and operations.
+* Handles authentication and authorization.
+* Manages repositories and cluster configurations.
+* Provides REST and gRPC APIs for integrations with external systems.
+* Serves the Argo CD Web UI.
+* Acts as the communication point for the **Argo CD CLI**.
+
+#### **Integration**
+
+External tools and systems can interact with Argo CD through its REST and gRPC APIs to automate workflows or extend its functionality.
+
+---
+
+### **2. Repository (Repo) Server**
+
+The **Repo Server** is an internal service responsible for interacting with Git repositories.
+
+#### **Responsibilities**
+
+* **Cloning Git repositories** to retrieve application source code and manifests.
+* **Generating Kubernetes manifests** from various supported sources, including:
+
+  * Helm charts
+  * Kustomize
+  * Plain YAML directories
+  * Jsonnet files
+* Provides the generated manifests to the Application Controller for deployment.
+
+---
+
+### **3. Application Controller**
+
+The **Application Controller** is a Kubernetes controller that continuously monitors and reconciles the state of applications managed by Argo CD.
+
+#### **Responsibilities**
+
+* Monitors application definitions and their live state in destination clusters.
+* Compares the **desired state** (from Git) with the **actual state** (in the cluster).
+* Communicates with:
+
+  * The **Repo Server** to retrieve manifests.
+  * The **Kubernetes API Server** to get live application data.
+* **Deploys and synchronizes** application manifests to destination clusters.
+* Detects **Out-of-Sync** applications and takes corrective actions as needed.
+* Executes **lifecycle hooks** (e.g., pre-sync and post-sync) to perform custom actions such as sending notifications after synchronization.
+
+---
+
+## **Additional Components**
+
+### **Redis**
+
+Redis is used as a **caching layer** to improve Argo CD performance and reduce redundant API calls.
+
+---
+
+### **Dex**
+
+Dex is an **identity service** integrated with Argo CD to provide authentication through external identity providers (IDPs).
+Examples include:
+
+* GitHub
+* GitLab
+* LDAP
+* SAML providers
+
+---
+
+### **ApplicationSet Controller**
+
+The **ApplicationSet Controller** automates the creation and management of multiple Argo CD applications.
+
+#### **Use Case Example**
+
+* Deploying the same application to multiple clusters or environments (e.g., dev, staging, production) with minimal manual configuration.
+
+---
+
+## **Summary**
+
+Argo CD’s architecture consists of tightly integrated components that handle every aspect of GitOps-based delivery:
+
+* The **Argo CD Server** provides interfaces and APIs for users and automation.
+* The **Repo Server** fetches and prepares manifests from Git.
+* The **Application Controller** ensures live applications match the declared state.
+* Supporting services like **Redis**, **Dex**, and the **ApplicationSet Controller** enhance scalability, authentication, and automation.
+

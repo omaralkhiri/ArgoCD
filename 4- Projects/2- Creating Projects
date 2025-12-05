@@ -1,0 +1,244 @@
+# **Argo CD Project Creation – Declarative Approach Documentation**
+
+## **Introduction**
+
+Argo CD Projects (AppProjects) provide a logical grouping mechanism for organizing applications within Argo CD. Projects allow you to enforce access controls, source and destination restrictions, and fine-grained resource limitations.
+They are especially useful when Argo CD is shared by multiple teams or environments.
+
+While Argo CD supports creating projects using:
+
+* **Declarative YAML/JSON (recommended)**
+* **CLI**
+* **Web UI**
+
+The **best practice** is to use the declarative approach—store all project configuration in Git to enable GitOps workflows, versioning, and auditing.
+
+This document explains in detail how to create and manage Argo CD Projects using YAML.
+
+---
+
+# **Creating a Project Using Declarative YAML**
+
+## **1. Basic Structure of an Argo CD Project**
+
+An Argo CD project is defined using the Kubernetes custom resource:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: <project-name>
+  namespace: argocd
+spec:
+  description: <optional-description>
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist: []
+```
+
+### **Key Sections**
+
+* **metadata.name** → Name of the project.
+* **spec.description** → Optional description of the project’s purpose.
+* **spec.sourceRepos** → Git repositories allowed as application sources.
+* **spec.destinations** → Allowed destination clusters and namespaces.
+* **spec.clusterResourceWhitelist / namespaceResourceWhitelist** → Allowed resource types (cluster-scoped and namespace-scoped).
+
+---
+
+# **2. Allowing Git Repositories (sourceRepos)**
+
+### **Allow all repositories**
+
+```yaml
+sourceRepos:
+  - "*"
+```
+
+The `*` wildcard means all Git repositories are allowed.
+
+### **Allow only specific repositories**
+
+```yaml
+sourceRepos:
+  - https://github.com/example/repo1.git
+  - https://github.com/example/repo2.git
+```
+
+This ensures applications in this project can only pull manifests from these repositories.
+
+---
+
+# **3. Allowing Destinations (destinations)**
+
+A destination is defined by:
+
+* **server** → the cluster API server URL
+* **namespace** → the namespace where applications can deploy
+
+### **Allow deployments to any cluster and any namespace**
+
+```yaml
+destinations:
+  - namespace: "*"
+    server: "*"
+```
+
+### **Restrict to a specific cluster and namespace**
+
+```yaml
+destinations:
+  - server: https://kubernetes.default.svc
+    namespace: production
+```
+
+You can define multiple destinations if needed.
+
+---
+
+# **4. Cluster-Scoped Resource Controls**
+
+You can control which **cluster-level resources** the project is allowed to create.
+
+### **Allow all cluster-scoped resources**
+
+```yaml
+clusterResourceWhitelist:
+  - group: "*"
+    kind: "*"
+```
+
+### **Allow only specific cluster-scoped resources (example: Namespace)**
+
+Example: Allow only the creation of Kubernetes Namespaces:
+
+```yaml
+clusterResourceWhitelist:
+  - group: ""
+    kind: Namespace
+```
+
+### **Deny specific cluster-scoped resources (blacklisting)**
+
+Argo CD supports blacklist using `clusterResourceBlacklist`:
+
+Example: Deny creation of NetworkPolicy:
+
+```yaml
+clusterResourceBlacklist:
+  - group: networking.k8s.io
+    kind: NetworkPolicy
+```
+
+This denies only NetworkPolicy resources while allowing everything else.
+
+---
+
+# **5. Namespace-Scoped Resource Controls**
+
+Namespace-scoped resources (Deployments, Services, ConfigMaps, etc.) can also be restricted.
+
+### **Allow all namespace resources**
+
+```yaml
+namespaceResourceWhitelist:
+  - group: "*"
+    kind: "*"
+```
+
+### **Allow only a specific namespace resource (example: Deployment)**
+
+```yaml
+namespaceResourceWhitelist:
+  - group: apps
+    kind: Deployment
+```
+
+### **Blacklist specific namespace resources**
+
+Example: Block creation of NetworkPolicy:
+
+```yaml
+namespaceResourceBlacklist:
+  - group: networking.k8s.io
+    kind: NetworkPolicy
+```
+
+---
+
+# **6. Full Example – Detailed AppProject YAML**
+
+Below is a complete and realistic project example combining all concepts:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: demo-project
+  namespace: argocd
+spec:
+  description: "Demo project for illustrating Argo CD declarative project configuration"
+
+  # Allow only specific Git repos
+  sourceRepos:
+    - https://github.com/example/my-app.git
+
+  # Allow only production namespace in the main cluster
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: production
+
+  # Allow only Namespace at cluster-level
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Allow only Deployment in namespaces
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+
+  # Deny NetworkPolicy at namespace level
+  namespaceResourceBlacklist:
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+```
+
+---
+
+# **7. Using the Project in an Application**
+
+To associate an Argo CD Application with this project, set the `project` field:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp
+  namespace: argocd
+spec:
+  project: demo-project
+  source:
+    repoURL: https://github.com/example/my-app.git
+    path: manifests
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+```
+
+The application will inherit all restrictions configured in the project.
+
+---
+
+# **Conclusion**
+
+Using the declarative approach to create Argo CD Projects provides:
+
+* Full GitOps workflow
+* Version-controlled access policies
+* Consistent deployment restrictions
+* Better team isolation and governance
+
+By defining Projects in YAML, you ensure that your environment remains predictable, secure, and aligned with best practices.

@@ -1,0 +1,98 @@
+## **Automated Self-Healing in Argo CD**
+
+### **Overview**
+
+Argo CD continuously monitors the state of Kubernetes resources deployed in the cluster and compares them to the desired state defined in the Git repository. While automated syncing can be enabled to apply changes from Git automatically, it **does not automatically correct manual changes** made directly to cluster resources. To address this, Argo CD provides a mechanism called **Self-Healing**.
+
+---
+
+### **What Is Self-Healing?**
+
+**Self-Healing** is an Argo CD feature that automatically **detects and corrects configuration drift** between the live cluster and the Git repository, even if the live state was changed manually using tools like `kubectl`.
+
+Without self-healing enabled, Argo CD will detect the difference but will **not** automatically reconcile it until a manual sync is triggered.
+
+Example of configuration drift:
+
+```bash
+kubectl scale deployment my-deployment --replicas=5
+```
+
+If Git contains replicas = 3, scaling it to 5 causes drift. Self-healing reverts it back to match Git (replicas = 3).
+
+---
+
+### **How to Enable Self-Healing**
+
+Self-healing can be configured in **three ways**:
+
+---
+
+#### **1️⃣ Declaratively (YAML Manifest)**
+
+Add the `selfHeal` field under the `syncPolicy.automated` section of the Application manifest:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: example-app
+spec:
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: app-manifests
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+```
+
+---
+
+#### **2️⃣ Using CLI**
+
+When creating or updating an application via CLI, include `--self-heal`:
+
+```bash
+argocd app create example-app \
+  --repo https://github.com/org/repo.git \
+  --path app-manifests \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace default \
+  --sync-policy automated \
+  --self-heal
+```
+
+---
+
+#### **3️⃣ Using Argo CD Web UI**
+
+1. Open **Argo CD Dashboard**
+2. Click **New App** or edit an existing app
+3. Go to the **Sync Policy** section
+4. Enable:
+
+   * **Automated sync**
+   * **Self-Heal** checkbox
+
+---
+
+### **Important Notes**
+
+* Self-healing **only applies to resources managed by Argo CD**.
+* If pruning is not enabled (`prune: false`), self-healing **will restore configuration**, but **will not delete resources removed from Git**.
+* Self-healing is useful for enforcing **GitOps immutability and security compliance**.
+* If a cluster change is required permanently, update **Git**, not the cluster directly.
+
+---
+
+### **Summary**
+
+| Feature              | Behavior                                          |
+| -------------------- | ------------------------------------------------- |
+| Automated Sync       | Applies changes from Git to cluster automatically |
+| Self-Healing         | Reverts manual cluster changes to match Git       |
+| Without Self-Healing | Drift is detected but not fixed automatically     |

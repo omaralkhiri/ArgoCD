@@ -1,0 +1,302 @@
+# **Argo CD ApplicationSet Generators – Full Documentation**
+
+## **Introduction**
+
+Argo CD’s **ApplicationSet** controller extends Argo CD by enabling dynamic and automated creation of Argo CD Applications. It does this using **generators**, which produce parameter sets derived from various data sources—such as lists, clusters, or Git repositories. These generated parameters are then inserted into an **Application template** to render multiple applications from a single ApplicationSet manifest.
+
+This document provides a detailed explanation of the most commonly used generators, including List, Cluster, and Git generators, along with an overview of other generator types.
+
+---
+
+# **1. What Are Generators?**
+
+Generators in ApplicationSet are responsible for producing **key-value parameter sets**. These parameters are injected into a reusable application template, generating one or more Argo CD Applications dynamically.
+
+Common use cases include:
+
+* Deploying a single application across multiple clusters
+* Generating applications from Git repository directory structures
+* Deploying applications based on environment metadata in JSON/YAML files
+* Deploying based on open pull requests or GitHub organizations
+
+---
+
+# **2. List Generator**
+
+## **Overview**
+
+The **List Generator** allows users to define static lists of key-value objects. Each item in the list becomes a set of parameters applied to the Application template.
+
+## **Example**
+
+```yaml
+generators:
+  - list:
+      elements:
+        - cluster: cluster1
+          url: https://cluster1.example.com
+        - cluster: cluster2
+          url: https://cluster2.example.com
+```
+
+### How It Works
+
+Each element defines a parameter set such as:
+
+* `cluster: cluster1`
+* `url: https://...`
+
+These values are used in the Application template:
+
+```yaml
+name: my-app-{{cluster}}
+destination:
+  server: "{{url}}"
+```
+
+**Note:**
+Any cluster referenced in the List Generator must already exist inside Argo CD.
+
+---
+
+# **3. Cluster Generator**
+
+## **Overview**
+
+The **Cluster Generator** automatically produces parameter sets for **every cluster registered inside Argo CD**. Argo CD stores clusters as Kubernetes Secrets (type: `cluster`), allowing addition of labels, annotations, and custom `values` fields.
+
+### Parameters Provided by the Cluster Generator
+
+* `name` – cluster name
+* `nameNormalized` – name with special characters removed
+* `server` – cluster API server URL
+* `labels` – cluster labels
+* `annotations` – cluster annotations
+* `values` – user-defined additional key/value fields
+
+### Example 1 – Deploy to All Clusters
+
+```yaml
+generators:
+  - clusters: {}
+```
+
+An empty selector means “use all clusters.”
+
+### Example 2 – Deploy to Clusters Matching Labels
+
+Clusters are stored as secrets. A cluster may contain:
+
+```yaml
+metadata:
+  labels:
+    staging: "true"
+```
+
+ApplicationSet:
+
+```yaml
+generators:
+  - clusters:
+      selector:
+        matchLabels:
+          staging: "true"
+```
+
+This deploys only to clusters labeled as staging.
+
+### Important Note
+
+The **local Argo CD cluster is *not* registered as a secret by default**.
+To use it with the Cluster Generator:
+
+* Add it *declaratively*, or
+* Edit the cluster name in the Argo CD UI to force Argo CD to create a Secret.
+  Declarative configuration is recommended.
+
+### Example – Passing Additional Values
+
+```yaml
+values:
+  revision: head    # staging clusters
+```
+
+Application template:
+
+```yaml
+source:
+  targetRevision: "{{values.revision}}"
+```
+
+---
+
+# **4. Git Generator**
+
+The Git Generator creates applications based on the structure or contents of files in a Git repository. It has two types:
+
+1. **Git Directory Generator**
+2. **Git Files Generator**
+
+---
+
+## **4.1 Git Directory Generator**
+
+### **Overview**
+
+Generates parameter sets based on directory structure within a Git repository. Useful when each subdirectory represents an application or component.
+
+### Parameters Provided
+
+* `path` – full directory path
+* `path.basename` – last directory name
+* `path.basenameNormalized` – directory name normalized (unsupported characters such as `_` replaced with `-`)
+
+### Example Repository Structure
+
+```
+cluster-addons/
+  argo-workflows/
+  prometheus-operator/
+```
+
+### Example ApplicationSet
+
+```yaml
+generators:
+  - git:
+      repoURL: https://github.com/example/repo
+      revision: main
+      directories:
+        - path: cluster-addons/*
+```
+
+This generates two applications:
+
+* argo-workflows
+* prometheus-operator
+
+### Using Parameters in the Template
+
+```yaml
+destination:
+  namespace: "{{path.basename}}"
+source:
+  path: "{{path}}"
+```
+
+### Excluding Directories
+
+```yaml
+directories:
+  - path: cluster-addons/*
+    exclude: true
+```
+
+By default, directories starting with `.` are excluded.
+
+---
+
+## **4.2 Git Files Generator**
+
+### **Overview**
+
+Generates parameters based on the contents of **JSON or YAML files** inside a Git repository.
+
+Useful for:
+
+* Deploying the same app to multiple environments
+* Using environment metadata
+* Infra-as-config patterns
+
+### Example Repository Structure
+
+```
+gitbook/
+  deployment.yaml
+  service.yaml
+cluster-config/
+  dev.json
+  prod.json
+```
+
+### Example dev.json
+
+```json
+{
+  "name": "dev",
+  "address": "https://dev.cluster.example.com",
+  "owner": "team-a"
+}
+```
+
+### ApplicationSet
+
+```yaml
+generators:
+  - git:
+      repoURL: https://github.com/example/repo
+      revision: main
+      files:
+        - path: cluster-config/*.json
+```
+
+Template uses parameters like:
+
+```yaml
+metadata:
+  name: "{{name}}"
+destination:
+  server: "{{address}}"
+```
+
+This produces:
+
+* one application for dev
+* one application for prod
+
+---
+
+# **5. Other Generator Types (Overview)**
+
+## **Matrix Generator**
+
+Combines parameters from **multiple generators**.
+Example: Git Directory Generator × Cluster Generator
+→ deploy each app into each cluster.
+
+## **Merge Generator**
+
+Merges parameters from two or more generators and allows overriding values.
+
+## **SCM Provider Generator**
+
+Uses source control provider APIs (e.g., GitHub, GitLab) to discover:
+
+* repositories in an organization
+* branches
+* teams
+
+## **Pull Request Generator**
+
+Discovers **open pull requests** via SCM API and creates applications per PR.
+Useful for ephemeral preview environments.
+
+## **Cluster Decision Resource Generator**
+
+Advanced generator that uses custom Kubernetes resources to determine:
+
+* where apps should be deployed
+* custom placement logic
+
+---
+
+# **Conclusion**
+
+ApplicationSet Generators in Argo CD provide a powerful, flexible mechanism for automating application deployments across clusters, directories, environments, and external systems. Each generator serves a distinct purpose—from simple list-based deployments to dynamic GitOps pipelines triggered by file structures or pull requests.
+
+By mastering these generators, teams can:
+
+* simplify multi-cluster GitOps
+* improve automation
+* reduce repetitive configuration
+* enforce consistency across environments

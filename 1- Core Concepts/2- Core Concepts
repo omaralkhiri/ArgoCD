@@ -1,0 +1,91 @@
+# **Argo CD Core Concepts**
+
+This document explains some of the key concepts in **Argo CD**, focusing on **Applications**, **Projects**, and the ideas of **Desired State**, **Actual State**, and **Sync**.
+
+---
+
+## **1. Application**
+
+An **Application** in Argo CD is the fundamental unit that defines what to deploy and where to deploy it.
+Each application consists of two main parts:
+
+1. **Source** – The location of your manifests.
+   Argo CD supports multiple source types, including:
+
+   * **Helm charts**
+   * **Kustomize**
+   * **Directory with YAML files**
+   * **Jsonnet**
+
+2. **Destination** – The target **cluster** and **namespace** where the application will be deployed.
+
+In short, an application defines:
+
+* **What** to deploy (source)
+* **Where** to deploy it (destination)
+
+---
+
+## **2. Project**
+
+A **Project** in Argo CD acts as a **logical grouping** of multiple applications.
+For example, if you have applications `app1`, `app2`, `app3`, and `app4` that belong to the same business or team, you can group them under **Project 1**.
+
+By default, Argo CD provides a **default project**.
+Each application **must** belong to a project — specifying a project is **mandatory**.
+
+### **Benefits of Using Projects**
+
+Projects are especially useful in **multi-team environments** because they allow for better organization and access control.
+You can:
+
+* **Restrict or allow specific sources** (Git repositories, Helm repos, etc.) a project can use.
+* **Restrict or allow destination clusters and namespaces** that applications within the project can deploy to.
+* **Restrict specific Kubernetes resource types** (e.g., only allow Deployments, DaemonSets, or StatefulSets).
+
+---
+
+## **3. Desired State vs Actual State**
+
+Argo CD operates based on two states:
+
+* **Desired State:**
+  The configuration stored in your Git repository.
+  It represents how your environment *should* look.
+
+* **Actual State:**
+  The configuration that is currently running in your Kubernetes cluster.
+
+Argo CD continuously compares these two states to ensure your cluster matches the configuration defined in Git.
+
+---
+
+## **4. Sync**
+
+**Sync** is the process that brings the **actual state** in line with the **desired state**.
+When you trigger a sync, Argo CD deploys the manifests from Git (desired state) into the destination cluster (actual state).
+
+---
+
+## **5. Refresh / Compare**
+
+**Refresh** or **Compare** is the process of checking for differences between the desired state (in Git) and the actual state (in the cluster).
+Argo CD uses this comparison to determine if an application is:
+
+* **In Sync** – The cluster matches the Git configuration.
+* **Out of Sync** – There are differences between the cluster and Git.
+
+By default, Argo CD automatically refreshes applications **every 3 minutes**.
+
+---
+
+### **Summary**
+
+| Concept             | Description                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| **Application**     | Defines source (manifests) and destination (cluster/namespace).          |
+| **Project**         | Logical grouping of applications; provides access and resource controls. |
+| **Desired State**   | Configuration defined in Git.                                            |
+| **Actual State**    | What is currently running in the cluster.                                |
+| **Sync**            | Process of aligning actual state with desired state.                     |
+| **Refresh/Compare** | Process of checking differences between desired and actual states.       |

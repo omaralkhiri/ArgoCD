@@ -1,0 +1,112 @@
+# Argo CD Installation Options
+
+## Overview
+
+Argo CD can be installed on any running Kubernetes cluster, whether it is a local development setup or a full-scale production environment. Supported cluster types include:
+
+* **Single-node clusters** such as Minikube, Docker Desktop, or Kind
+* **Multi-node production clusters**
+
+You can choose the setup that best fits your environment and use case.
+
+---
+
+## Installation Types
+
+### 1. Non-Highly Available (Non-HA) Setup
+
+* **Purpose:** Suitable for evaluation, development, or test environments.
+* **Description:** Argo CD installs **one pod for each component**.
+* **Characteristics:**
+
+  * Simple and easy to deploy.
+  * Not fault-tolerant (single instance of each component).
+
+---
+
+### 2. Highly Available (HA) Setup
+
+* **Purpose:** Recommended for **production environments**.
+* **Requirements:** At least **three worker nodes** in your Kubernetes cluster.
+* **Description:**
+
+  * Argo CD deploys multiple replicas of its components across different nodes.
+  * Ensures high availability and resilience against node failures.
+
+---
+
+### 3. Lightweight Installation
+
+* **Purpose:** Suitable for **administrative use only**.
+* **Description:**
+
+  * Installs Argo CD **without the UI and API server**.
+  * By default, it is installed as a **non-HA setup**.
+* **Use Case:** Ideal when Argo CD will only be accessed by administrators via CLI.
+
+---
+
+## Privilege Options
+
+Argo CD can be installed with different privilege levels depending on your deployment scope:
+
+### 1. Cluster-Admin Privileges
+
+* **Purpose:** Use when Argo CD will deploy applications into the **same cluster** where it runs.
+* **Access:** Full cluster-wide control.
+
+### 2. Namespace-Level Privileges
+
+* **Purpose:** Use when Argo CD is managing **external clusters** or when limited access is required.
+* **Access:** Restricted to a specific namespace.
+
+---
+
+## Installation Methods
+
+Argo CD supports multiple methods for installation, depending on your preferred deployment tool:
+
+1. **YAML Manifests** – Apply the official installation manifests directly using `kubectl`.
+2. **Helm Chart** – Use Helm for templated and configurable installation.
+3. **Kustomize** – Customize the manifests for flexible configuration and version control.
+
+---
+
+## Summary
+
+| Setup Type  | Recommended For  | HA Support | UI/API Included | Minimum Nodes |
+| ----------- | ---------------- | ---------- | --------------- | ------------- |
+| Non-HA      | Development/Test | No         | Yes             | 1             |
+| HA          | Production       | Yes        | Yes             | 3             |
+| Lightweight | Admin Only       | No         | No              | 1             |
+
+---
+
+**Next Step:** Proceed to choose the installation method that best fits your environment and follow the official Argo CD installation guide.
+
+
+You need to create a namespace for argocd.
+
+kubectl create ns argocd
+
+and then choose one of the below options :
+
+1. Non-HA:
+
+a. cluster-admin privileges: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+b. namespace level privileges: https://github.com/argoproj/argo-cd/raw/stable/manifests/namespace-install.yaml
+
+
+
+2. HA:
+
+a. cluster-admin privileges: https://github.com/argoproj/argo-cd/raw/stable/manifests/ha/install.yaml
+
+b. namespace level privileges: https://github.com/argoproj/argo-cd/raw/stable/manifests/ha/namespace-install.yaml
+
+3. Light installation "Core"
+
+https://github.com/argoproj/argo-cd/raw/stable/manifests/core-install.yaml
+
+4. Helm chart: https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd

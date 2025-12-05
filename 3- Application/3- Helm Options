@@ -1,0 +1,197 @@
+## **Helm Options Supported by Argo CD**
+
+### **Overview**
+
+Argo CD provides built-in support for deploying **Helm-based applications**. Helm charts can be sourced either from a **Git repository** or a **Helm repository**.
+This section describes all Helm-related options supported by Argo CD and how to configure them in your application definition.
+
+---
+
+### **1. Helm Sources**
+
+Helm applications can be deployed from two types of sources:
+
+#### **a. Git Repository**
+
+When using a **Git repository**, Argo CD expects the path to your Helm chart within the repository.
+Example:
+
+```yaml
+source:
+  repoURL: https://github.com/example/helm-charts.git
+  targetRevision: main
+  path: charts/my-app
+  helm:
+    releaseName: my-helm-release
+```
+
+#### **b. Helm Repository**
+
+When using a **Helm repository**, you must specify:
+
+* The **Helm repository URL**
+* The **chart name**
+* (Optionally) The **chart version**, which is specified under `targetRevision`
+
+Example:
+
+```yaml
+source:
+  repoURL: https://charts.bitnami.com/bitnami
+  chart: nginx
+  targetRevision: 15.3.2
+  helm:
+    releaseName: nginx-release
+```
+
+---
+
+### **2. Helm Options Supported by Argo CD**
+
+Argo CD’s Helm integration provides several configuration options to customize how charts are rendered and deployed.
+
+#### **a. Release Name**
+
+You can specify a custom release name using the `releaseName` attribute.
+If not set, Argo CD uses the **application name** as the default Helm release name.
+
+Example:
+
+```yaml
+helm:
+  releaseName: custom-release
+```
+
+---
+
+#### **b. Values Files**
+
+By default, Helm uses its internal `values.yaml` file.
+However, Argo CD allows you to specify one or more **custom values files**.
+These files are typically stored in the same repository as the chart.
+
+Example:
+
+```yaml
+helm:
+  valueFiles:
+    - values.yaml
+    - values-production.yaml
+```
+
+This setup merges the specified values files in order. The last file listed overrides any duplicated values from earlier ones.
+
+---
+
+#### **c. Individual Parameters**
+
+You can define individual Helm parameters that override values defined in `values.yaml`.
+
+Example:
+
+```yaml
+helm:
+  parameters:
+    - name: replicaCount
+      value: "3"
+    - name: image.tag
+      value: "1.22.0"
+```
+
+This is useful for simple overrides without modifying or maintaining separate values files.
+
+---
+
+#### **d. Parameters from File**
+
+When you have a large number of parameters or sensitive values, it may be more convenient to load parameters from a specific file rather than defining them inline.
+This file can be referenced in your application definition.
+
+Example:
+
+```yaml
+helm:
+  fileParameters:
+    - name: config
+      path: config/values.yaml
+```
+
+---
+
+#### **e. Inline Values (Block Text)**
+
+Argo CD also allows you to define a Helm values file **inline** within your application manifest.
+This is useful for defining small sets of configuration without maintaining an external file.
+
+Example:
+
+```yaml
+helm:
+  values: |
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.24.0"
+```
+
+---
+
+### **3. Summary**
+
+| Option           | Description                                           | Example                                                        |      |
+| ---------------- | ----------------------------------------------------- | -------------------------------------------------------------- | ---- |
+| `releaseName`    | Overrides default release name (defaults to app name) | `releaseName: myapp`                                           |      |
+| `valueFiles`     | One or more YAML files with custom Helm values        | `valueFiles: [values-prod.yaml]`                               |      |
+| `parameters`     | Individual Helm parameters overriding chart defaults  | `parameters: [{ name: image.tag, value: 1.0.0 }]`              |      |
+| `fileParameters` | Load Helm parameters from external file               | `fileParameters: [{ name: config, path: config/values.yaml }]` |      |
+| `values`         | Inline YAML values defined directly in manifest       | `values:                                                       | ...` |
+
+---
+
+### **4. Example: Full Argo CD Application Definition**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-helm-app
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  project: default
+  source:
+    repoURL: https://github.com/example/helm-charts.git
+    targetRevision: main
+    path: charts/my-app
+    helm:
+      releaseName: myapp-release
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+      parameters:
+        - name: image.tag
+          value: "2.0.1"
+      fileParameters:
+        - name: config
+          path: config/production-values.yaml
+      values: |
+        replicaCount: 3
+        service:
+          type: LoadBalancer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+---
+
+### **Conclusion**
+
+Argo CD provides flexible and powerful Helm integration that allows you to:
+
+* Deploy Helm charts from both Git and Helm repositories
+* Customize release names
+* Use multiple value sources (files, parameters, inline YAML)
+

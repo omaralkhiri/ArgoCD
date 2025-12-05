@@ -1,0 +1,230 @@
+# **Argo CD ApplicationSet – Pull Request Generator Documentation**
+
+## **Overview**
+
+The **Pull Request (PR) Generator** in Argo CD ApplicationSet enables the automatic creation of applications for open pull requests in your Git provider.
+This feature allows teams to create **dynamic preview environments** for testing new features, reviewing changes, and validating application behavior before merging into main branches.
+
+When a pull request is opened, the generator creates an Argo CD Application that deploys the PR’s code into an isolated Kubernetes namespace.
+When the pull request is merged or closed, Argo CD removes the associated application automatically.
+
+---
+
+## **Supported Git Providers**
+
+The PR Generator currently supports the following Git providers:
+
+* **GitHub**
+* **GitLab**
+* **Bitbucket Server**
+
+Additional providers will be supported in future Argo CD releases.
+
+---
+
+## **How the PR Generator Works**
+
+1. Argo CD ApplicationSet scans your Git provider for **open pull requests**.
+2. For each PR that matches filters (if any), a new **Argo CD Application** is generated.
+3. The application deploys into an isolated namespace for that specific PR.
+4. When the PR is closed or merged:
+
+   * The ApplicationSet controller automatically **deletes the application** from the cluster.
+
+This workflow is ideal for:
+
+* Feature previews
+* Development and QA testing
+* Ephemeral environment automation
+
+---
+
+## **Filtering Pull Requests**
+
+You can control which pull requests trigger application generation using filters.
+If **no filters** are defined, **all open pull requests** are processed.
+
+### **1. Branch Filters (Regex)**
+
+You can match PRs based on their source branch using regular expressions.
+Example:
+
+```yaml
+filters:
+  - branchMatch: ".*web$"
+```
+
+This will select pull requests whose source branch ends with `web`.
+
+### **2. GitHub Label Filters (GitHub Only)**
+
+If you are using GitHub, you can also filter pull requests based on labels.
+
+Example:
+
+```yaml
+filters:
+  - label: "preview"
+```
+
+This will generate applications only for PRs that contain the label `preview`.
+
+---
+
+## **Parameters Provided by the PR Generator**
+
+Within the ApplicationSet template, the generator exposes several useful parameters:
+
+| Parameter | Description                             |
+| --------- | --------------------------------------- |
+| `number`  | The pull request ID number              |
+| `branch`  | The pull request **source branch name** |
+| `headSHA` | The SHA hash of the PR head commit      |
+
+These parameters are commonly used to build:
+
+* Unique application names
+* Isolated namespaces
+* Target revision versions
+
+---
+
+## **ApplicationSet Reconciliation Interval**
+
+By default, the ApplicationSet controller scans for changes **every 30 minutes**.
+This means that creating a new PR may take up to 30 minutes before the related application is created.
+
+### **Ways to Reduce Delay**
+
+#### **Option 1: Decrease `requeueAfterSeconds`**
+
+You can reduce the polling interval by updating:
+
+```yaml
+requeueAfterSeconds: 300
+```
+
+(300 seconds = 5 minutes)
+
+#### **Option 2: Use Git Provider Webhooks (Recommended)**
+
+Configuring a **Webhook** is a better and faster approach.
+When events happen (create PR, update PR, close PR, add labels), Argo CD receives an immediate notification and updates the cluster accordingly.
+
+Webhook triggers:
+
+* PR created
+* PR updated
+* PR closed
+* Labels added/removed
+* Commits pushed
+
+This ensures real-time synchronization.
+
+---
+
+## **Example: ApplicationSet Using Pull Request Generator (GitHub)**
+
+Below is a full example demonstrating:
+
+* GitHub PR discovery
+* Label filtering
+* Dynamic application naming
+* Isolated namespace creation
+* Using PR commit SHA as revision
+* Deploying Helm, Kustomize, or raw YAML manifests
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pr-environments
+spec:
+  generators:
+    - pullRequest:
+        github:
+          owner: <github-owner>
+          repo: <repository-name>
+        filters:
+          - label: "preview"              # Optional (GitHub-only)
+          - branchMatch: ".*web$"         # Optional regex filter
+        requeueAfterSeconds: 300          # Optional optimization
+
+  template:
+    metadata:
+      name: "webapp-{{branch}}-pr{{number}}"  # Unique application name
+    spec:
+      project: default
+
+      destination:
+        namespace: "preview-{{branch}}-pr{{number}}"  # Isolated namespace
+        server: https://kubernetes.default.svc
+
+      source:
+        repoURL: "https://github.com/<github-owner>/<repository-name>.git"
+        targetRevision: "{{headSHA}}"                  # Use PR commit SHA
+        path: "manifests/"                             # Helm/Kustomize/YAML
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+```
+
+---
+
+## **Explanation of the Example**
+
+### **1. Pull Request Generator**
+
+* Scans GitHub for open PRs.
+* Filters based on label `preview` and branches ending with `web`.
+
+### **2. Template Section**
+
+Uses generator parameters:
+
+#### Name:
+
+```
+webapp-{{branch}}-pr{{number}}
+```
+
+Ensures a unique name like:
+
+```
+webapp-feature-login-pr12
+```
+
+#### Namespace:
+
+```
+preview-{{branch}}-pr{{number}}
+```
+
+Each PR is deployed into its own namespace, such as:
+
+```
+preview-feature-login-pr12
+```
+
+#### Source:
+
+* Uses the PR `headSHA` to deploy the exact commit being reviewed.
+* You define the path to your manifests (Helm, Kustomize, or raw YAML).
+
+---
+
+## **Summary**
+
+The Argo CD Pull Request Generator provides a powerful and automated way to create **ephemeral preview environments** for every pull request.
+Using filters, labels, and branch matching, you can fine-tune which PRs generate environments.
+
+With webhook integration, PR events trigger immediate updates, allowing fast and efficient review workflows.
+
+This setup is ideal for teams adopting:
+
+* GitOps
+* Continuous Deployment
+* Feature preview environments
+* Automated testing in Kubernetes

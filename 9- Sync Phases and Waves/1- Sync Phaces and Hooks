@@ -1,0 +1,119 @@
+## **Argo CD Sync Phases & Resource Hooks – Detailed Documentation**
+
+Argo CD provides a powerful synchronization model that controls how application resources are deployed into a Kubernetes cluster. This model includes **sync phases** and **resource hooks**, which allow users to control execution order, perform preparatory or cleanup tasks, and automate workflows around deployments.
+
+---
+
+### ## **1. Sync Phases in Argo CD**
+
+Argo CD divides the deployment process into **three ordered phases**. Each phase executes only after the previous one has completed successfully and all resources within that phase become **Healthy**.
+
+| Phase        | Description                                        | Typical Use Cases                                                        |
+| ------------ | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| **PreSync**  | Runs before main application manifests are applied | Database migrations, config setup, validation scripts, secrets injection |
+| **Sync**     | Applies main application manifests                 | Deployments, Services, Ingress, ConfigMaps, StatefulSets, etc.           |
+| **PostSync** | Executes after Sync resources have become Healthy  | Notifications, cleanup tasks, triggering external workflows              |
+
+#### Execution Behavior
+
+* Argo CD scans resources to find hooks that belong to a specific phase.
+* It **waits** until all resources in the current phase:
+
+  * Are **successfully created**
+  * Reach a **Healthy** status
+* Once completed, execution continues to the next phase.
+
+---
+
+### ## **2. Using Phases Through Resource Hooks**
+
+To assign a resource to a specific sync phase, Argo CD provides a system of **annotations** called **Resource Hooks**.
+
+These annotations can be added to **any Kubernetes manifest** in the Git repository, such as Deployments, Jobs, Services, Ingress, etc.
+
+#### Example Annotation:
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+```
+
+> Note: **Hooks do not execute when performing selective syncs.**
+
+---
+
+### ## **3. Available Hook Types**
+
+Argo CD supports multiple hook types. Each hook triggers at a different stage in the application sync lifecycle.
+
+| Hook Type    | Description                                 |
+| ------------ | ------------------------------------------- |
+| **PreSync**  | Executes *before* Sync manifests            |
+| **Sync**     | Executes *during* the Sync phase            |
+| **PostSync** | Executes *after* Sync is successful         |
+| **Skip**     | Excludes resource from syncing              |
+| **SyncFail** | Executes only when the sync operation fails |
+
+---
+
+### ## **4. Hook Deletion Policies**
+
+Hooks often create temporary resources (e.g., Jobs). Argo CD allows controlling their deletion using the following annotation:
+
+```yaml
+argocd.argoproj.io/hook-delete-policy: <policy_type>
+```
+
+| Policy                           | Description                                         |
+| -------------------------------- | --------------------------------------------------- |
+| **HookSucceeded**                | Delete resource only if hook completed successfully |
+| **HookFailed**                   | Delete resource only if hook failed                 |
+| **BeforeHookCreation (default)** | Delete existing resource before creating a new one  |
+
+---
+
+### ## **5. Practical Example**
+
+#### **Using a PreSync Hook to run a database migration job**
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-db
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      containers:
+      - name: db-migrator
+        image: myregistry/migrator:latest
+      restartPolicy: OnFailure
+```
+
+#### Explanation
+
+* The Job runs **before** application manifests are applied.
+* It will be **deleted automatically** once it succeeds.
+
+---
+
+### ## **6. Summary**
+
+* Argo CD sync phases allow controlled and ordered deployments.
+* Hooks enable execution of custom operational logic during the sync lifecycle.
+* Deletion policies help avoid leftover temporary resources.
+* Hooks must be carefully planned because they can influence deployment behavior.
+
+---
+
+### ## **Best Practices**
+
+* Use **PreSync** for all tasks that must complete before deploying your app.
+* Use Jobs instead of long-running pods for hooks.
+* Always apply deletion policies to avoid cluster clutter.
+* Avoid **Skip** hooks unless necessary, as it may cause drift.
+* Use **SyncFail** hooks for rollback or alerting mechanisms.

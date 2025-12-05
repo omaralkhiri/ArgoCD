@@ -1,0 +1,63 @@
+## Argo CD CLI Overview
+
+### Introduction
+
+In this lecture, we will discuss the **Argo CD Command Line Interface (CLI)**. The CLI is one of the primary methods to interact with Argo CD, alongside the **Web UI** and the **REST/gRPC API**.
+
+For automation workflows, particularly within CI/CD pipelines, the **Argo CD CLI** is the recommended tool.
+
+---
+
+### Capabilities of the CLI
+
+Using the Argo CD CLI, you can perform almost any administrative or operational task available in Argo CD, including:
+
+* Managing **applications**, **repositories**, and **clusters**
+* Performing **administrative tasks** such as exporting or importing data
+* Conducting **backup and restore** operations
+* Managing **projects**
+* Executing many other commands for configuration and maintenance
+
+---
+
+### Installation
+
+The Argo CD CLI can be installed on any major operating system, including:
+
+* **Linux**
+* **macOS**
+* **Windows**
+
+Installation packages and binaries are available in the [official Argo CD GitHub releases page](https://github.com/argoproj/argo-cd/releases).
+
+---
+
+### Logging In
+
+Once the CLI is installed, the first step is to **log in** to your Argo CD server.
+To do this, the server must be **reachable**. You can make the Argo CD server accessible using one of the following methods:
+
+* **Port forwarding**
+* **Ingress controller**
+* **LoadBalancer service**
+
+After establishing connectivity, you can log in using the following command:
+
+```bash
+argocd login <ARGOCD_SERVER> --username <USERNAME> --password <PASSWORD>
+```
+
+Once logged in, you can start managing your Argo CD resources through the CLI.
+
+---
+
+### Next Steps
+
+In the next section, we will demonstrate how to use the Argo CD CLI in action — including logging in, listing applications, and performing common management operations.
+
+
+CLI Installation instructions
+Follow official docs for your preferred platform (linux or mac or windows)
+
+
+https://argo-cd.readthedocs.io/en/stable/cli_installation/

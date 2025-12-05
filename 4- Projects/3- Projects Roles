@@ -1,0 +1,204 @@
+# **Argo CD Project Roles and Tokens Documentation**
+
+## **Overview**
+
+Argo CD Projects provide a way to logically group applications and control access to them. Using project roles and policies, you can grant fine-grained permissions to users, CI/CD systems, and external identity providers.
+
+Project roles allow you to define *what actions* an entity can perform on *which applications* inside a specific project. Tokens generated from these roles are then used for authentication and authorization.
+
+This document explains:
+
+* Why project roles are important
+* How policies work
+* How to define roles declaratively
+* How to generate project tokens
+* How to use tokens in CI systems and Argo CD CLI
+
+---
+
+## **Why Use Project Roles?**
+
+Project roles in Argo CD enable controlled and secure access to applications inside a project. Some key benefits:
+
+### **1. Logical Access Boundaries**
+
+If multiple teams or systems are using Argo CD, project roles allow you to isolate access by grouping applications under specific projects.
+
+### **2. Fine-Grained Access Control**
+
+You can restrict:
+
+* Which Git repositories applications within a project can use
+* Which clusters and namespaces they can deploy to
+* Which actions a CI/CD pipeline or user can perform on project applications
+
+### **3. CI/CD Access (Common Use Case)**
+
+A very common scenario is granting a CI system *sync-only* access to a project's applications.
+
+Example:
+
+* Create a role with only `sync` permission
+* Generate a JWT token
+* Provide that token to the CI system to perform sync operations securely
+
+### **4. OIDC Group Integration**
+
+You can bind Argo CD roles to OIDC groups so users inherit permissions automatically.
+
+---
+
+## **Defining Project Roles (Declarative Approach)**
+
+The recommended and best practice in Argo CD is to use the **declarative YAML** approach stored in Git.
+You define roles in the project manifest under the `spec.roles` section.
+
+### **Role Definition Structure**
+
+A role consists of:
+
+* **name** – Identifier for the role
+* **description** – Purpose of the role
+* **policies** – Access control rules
+* **groups (optional)** – Bind OIDC groups
+
+Below is an example YAML structure:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: demo
+spec:
+  roles:
+  - name: ci-role
+    description: "Role for CI system to sync applications"
+    policies:
+    - p, proj:demo:ci-role, applications, sync, demo/*, allow
+    groups: []
+```
+
+---
+
+## **Understanding Argo CD Policy Structure**
+
+Argo CD uses a policy format based on the Casbin model.
+
+### **Policy Format**
+
+```
+p, proj:<project-name>:<role-name>, <resource>, <action>, <target>, allow
+```
+
+### **Field Breakdown**
+
+| Component               | Meaning                                             |
+| ----------------------- | --------------------------------------------------- |
+| `p`                     | Indicates a policy rule                             |
+| `proj:<project>:<role>` | The project and role the policy belongs to          |
+| `resource`              | Type of resource (commonly `applications`)          |
+| `action`                | Operation permitted (e.g., `get`, `sync`, `update`) |
+| `target`                | Application name or wildcard `*`                    |
+| `allow`                 | Permission decision                                 |
+
+### **Example Policy**
+
+```
+p, proj:demo:ci-role, applications, sync, demo/*, allow
+```
+
+This means:
+
+* Allow the role `ci-role`
+* Under project `demo`
+* To perform `sync`
+* On all applications in project `demo`
+
+---
+
+## **Generating Project Tokens**
+
+Project roles are only useful when you generate a **token** tied to the role.
+Tokens are **not stored inside Argo CD**, so once generated, **you must copy and save them**.
+
+### **Command to Generate a Token**
+
+```bash
+argocd proj role create-token <project-name> <role-name>
+```
+
+### **Example**
+
+```bash
+argocd proj role create-token demo ci-role
+```
+
+### **Output**
+
+Argo CD will output a JWT token similar to:
+
+```
+eyJhbGciOiJIUzI1NiIsInR...
+```
+
+⚠️ **Important:**
+This token is displayed only once. Save it securely (Vault, Secrets Manager, etc.)
+
+---
+
+## **Using the Token (Authentication)**
+
+You can use the token with:
+
+* Argo CD CLI
+* CI/CD systems (GitHub Actions, GitLab CI, Jenkins, etc.)
+* Scripts
+
+### **Option 1: Pass Token with CLI Flag**
+
+```bash
+argocd cluster list --auth-token <TOKEN>
+```
+
+### **Option 2: Use Environment Variable**
+
+```bash
+export ARGOCD_AUTH_TOKEN=<TOKEN>
+argocd app list
+```
+
+If using CI/CD pipelines, exporting the environment variable is the common method.
+
+---
+
+## **Real Example: CI System Syncing Applications**
+
+1. Define role in project
+2. Add policy: sync only
+3. Generate token
+4. Save token in the CI secret store
+5. CI script example:
+
+```bash
+export ARGOCD_AUTH_TOKEN=$ARGOCD_CI_TOKEN
+argocd app sync my-app
+```
+
+This ensures:
+
+* Minimal access
+* No user credentials
+* Secure automation
+
+---
+
+## **Summary**
+
+Argo CD project roles and tokens provide an essential security layer when managing multiple applications and teams. By defining declarative roles, creating policies, and generating tokens, you can securely automate sync operations and integrate external systems.
+
+Key points:
+
+* Use declarative YAML to define roles
+* Policies follow a strict Casbin style
+* Tokens must be saved; Argo CD does not store them
+* CI systems commonly use sync-only roles with generated tokens

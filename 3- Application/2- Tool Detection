@@ -1,0 +1,138 @@
+# **Argo CD Tool Detection**
+
+## **Overview**
+
+Argo CD is a declarative, GitOps continuous delivery tool for Kubernetes. It supports multiple configuration management tools such as **Helm**, **Kustomize**, and **plain YAML/JSON manifests**.
+When defining an Argo CD Application, Argo CD needs to identify which tool is used to render the Kubernetes manifests from the specified source path. This process is known as **tool detection**.
+
+---
+
+## **Supported Tools**
+
+Argo CD supports several popular configuration management tools, including:
+
+1. **Helm** – used for packaging Kubernetes applications using Helm charts.
+2. **Kustomize** – used for managing and customizing Kubernetes YAML configurations.
+3. **Directory of YAML/JSON files** – a simple directory containing raw Kubernetes manifest files.
+4. **Jsonnet** – a data-templating language that allows flexible and dynamic configuration.
+
+---
+
+## **Defining the Application Tool**
+
+In an Argo CD Application manifest, you can **explicitly specify** which tool should be used. This is done in the `spec.source` section of your Application YAML definition.
+
+### **1. Plain Directory of YAML Files**
+
+If your manifests are simple YAML files stored in a directory, you can define your Application like this:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-yaml-app
+spec:
+  source:
+    repoURL: https://github.com/example/repo.git
+    path: manifests/
+    directory: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+```
+
+Here, the `directory` key tells Argo CD that this is a directory containing YAML manifests.
+
+---
+
+### **2. Helm Chart**
+
+If your application uses a **Helm chart**, you can define it as follows:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-helm-app
+spec:
+  source:
+    repoURL: https://github.com/example/helm-repo.git
+    path: chart/
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+```
+
+The `helm` section provides configuration options specific to Helm, such as `valueFiles`, `parameters`, or `releaseName`.
+
+---
+
+### **3. Kustomize**
+
+If your application is defined using **Kustomize**, you can specify it like this:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-kustomize-app
+spec:
+  source:
+    repoURL: https://github.com/example/kustomize-repo.git
+    path: overlays/production
+    kustomize:
+      version: v4.5.7
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+```
+
+The `kustomize` section can include version details or image overrides.
+
+---
+
+## **Automatic Tool Detection**
+
+If you don’t explicitly specify the tool, Argo CD will automatically determine which one to use based on the contents of the source path.
+
+### **Detection Logic:**
+
+1. **Helm Chart Detection:**
+   If the specified path contains a `Chart.yaml` file, Argo CD automatically identifies it as a Helm chart.
+
+2. **Kustomize Detection:**
+   If the path contains either a `kustomization.yaml` or `kustomization.yml` file, Argo CD identifies it as a Kustomize application.
+
+3. **YAML Directory Detection:**
+   If neither of the above files is found, Argo CD assumes the directory contains plain YAML manifests and treats it as a simple manifest directory.
+
+This automatic detection makes it easy to manage different types of Kubernetes configurations without additional manual setup.
+
+---
+
+## **Specifying Tool in the Web UI**
+
+If you prefer using the Argo CD **Web UI**, you can also specify the tool directly while creating an application:
+
+1. Open the **Argo CD UI**.
+2. Click **“New App”**.
+3. Under **Source**, select your repository and path.
+4. Choose the **tool type** (Helm, Kustomize, or Directory).
+5. Configure any additional settings such as Helm values or Kustomize options.
+6. Click **Create** to deploy the application.
+
+---
+
+## **Summary**
+
+* Argo CD supports Helm, Kustomize, YAML/JSON directories, and Jsonnet.
+* You can explicitly define the tool in your Application YAML or let Argo CD detect it automatically.
+* Detection is based on specific files:
+
+  * `Chart.yaml` → Helm
+  * `kustomization.yaml` or `kustomization.yml` → Kustomize
+  * No specific file → Directory of YAML manifests
+* You can configure or override the tool type both via YAML or the Web UI.

@@ -1,0 +1,100 @@
+## **Automated Pruning in Argo CD — Detailed Documentation**
+
+### **Overview**
+
+Argo CD continuously compares the state of your Kubernetes cluster with the desired state stored inside your Git repository. When automated sync is enabled, Argo CD automatically applies changes detected in Git to the target cluster without requiring manual intervention.
+
+However, **by default**, automated sync **does not delete resources** that were removed from the Git repository. This default behavior is a safety mechanism to avoid accidental deletion of live resources.
+
+To ensure that removed resources in Git are also deleted from the Kubernetes cluster, Argo CD provides a feature called **Automated Pruning**.
+
+---
+
+### **What Is Automated Pruning?**
+
+**Automated Pruning** ensures that any Kubernetes object deleted from the Git repository is automatically removed from the destination cluster as well. This enables true GitOps parity between Git and the live environment, making Git the *single source of truth*.
+
+---
+
+### **How to Enable Automated Pruning**
+
+You can enable automated pruning using **any of the following methods**:
+
+#### **1. Declarative Method (YAML Manifest)**
+
+In the application's `syncPolicy` specification, add the `automated` block and set `prune: true`:
+
+```yaml
+spec:
+  syncPolicy:
+    automated:
+      prune: true
+```
+
+Optionally, you can also enable self-healing:
+
+```yaml
+spec:
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+---
+
+#### **2. Using Argo CD CLI**
+
+When creating an application via the CLI, include the `--auto-prune` flag:
+
+```bash
+argocd app create <APP_NAME> \
+  --repo <REPO_URL> \
+  --path <APP_PATH> \
+  --dest-server <DEST_SERVER> \
+  --dest-namespace <NAMESPACE> \
+  --sync-policy automated \
+  --auto-prune
+```
+
+---
+
+#### **3. Using Argo CD Web UI**
+
+When creating or editing an application through the web UI:
+
+1. Navigate to **Applications**
+2. Click **New App** or edit an existing one
+3. Go to the **Sync Policy** section
+4. Enable **Auto-Prune** (checkbox labeled *Prune Resources*)
+
+---
+
+### **Manual Sync With Pruning**
+
+Even if automated pruning is not enabled, you can still prune resources during a **manual sync**:
+
+1. Open the application in the Argo CD UI
+2. Click **Sync**
+3. Check the **Prune** option
+4. Confirm sync
+
+This ensures that deleted Git resources are removed during that manual sync only.
+
+---
+
+### **Summary**
+
+| Feature                                | Default | After Enabling Pruning |
+| -------------------------------------- | ------- | ---------------------- |
+| Apply changes from Git automatically   | ✔       | ✔                      |
+| Delete removed resources automatically | ✘       | ✔                      |
+| Prevents drift between Git and cluster | Limited | Full GitOps compliance |
+
+---
+
+### **Important Notes**
+
+* Use pruning with caution, especially in shared environments.
+* Ensure Git is always accurate and reviewed before merging changes.
+* Combine with branch protection and code review for production safety.

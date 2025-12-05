@@ -1,0 +1,156 @@
+# **Diffing & Customization in Argo CD**
+
+## **Introduction**
+
+Hello everyone.
+In this lecture, we will explore **diffing** and **diff customization** in Argo CD.
+
+When Argo CD synchronizes your manifests with the cluster, it continuously compares (diffs) the **desired state in Git** with the **live state in the cluster**.
+However, there are cases where the application may go **OutOfSync** immediately after synchronization due to runtime modifications or non-deterministic manifest generation.
+
+This documentation explains why these differences happen and how to configure diff customization in Argo CD to properly handle them.
+
+---
+
+## **Why Differences Occur**
+
+Below are common scenarios where resources become **OutOfSync** due to live state changes or manifest inconsistencies.
+
+### **1. Controller or Mutating Webhook Modifications**
+
+Some Kubernetes controllers, admission webhooks, or operators **modify resources at runtime** after creation (e.g., injecting sidecars, setting defaults).
+This results in differences between:
+
+* Git-based desired manifests
+* Actual cluster resources
+
+Example tools that cause this:
+
+* Istio sidecar injector
+* MutatingAdmissionWebhook
+* VerticalPodAutoscaler
+
+---
+
+### **2. Non-Deterministic Templates in Helm**
+
+If Helm charts use template functions such as:
+
+```
+randAlphaNum
+randAlpha
+uuidv4
+```
+
+They produce **new/random values every render**, causing diff mismatches on every sync/refresh operation.
+
+---
+
+### **3. Invalid or Unsupported Fields in Manifests**
+
+If manifests contain:
+
+* Unknown fields
+* Deprecated API attributes
+* Extra fields not recognized by Kubernetes
+
+The live state will drop or modify them, causing drift detection in Argo CD.
+
+---
+
+## **Diff Customization Configuration Levels**
+
+You can configure diff customization at two levels:
+
+| Level             | Scope              | Description                                      |
+| ----------------- | ------------------ | ------------------------------------------------ |
+| Application level | Single application | Affects only the target application              |
+| System level      | All applications   | Applied cluster-wide using `argocd-cm` ConfigMap |
+
+---
+
+## **Methods of Ignoring Differences**
+
+Argo CD provides multiple mechanisms to ignore specific differences:
+
+1. **JSON Pointers**
+2. **JQ Path Expressions**
+3. **Ignoring Fields Owned by Specific Managers**
+
+---
+
+### **1. Using JSON Pointers**
+
+JSON pointers allow ignoring differences inside specific fields for a certain resource type.
+
+Example: **Ignore `spec.replicas` for all Deployments** in an application:
+
+```yaml
+spec:
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas
+```
+
+You can also target a specific resource by **name**:
+
+```yaml
+spec:
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    name: guestbook
+    jsonPointers:
+    - /spec/replicas
+```
+
+---
+
+### **2. Using JQ Path Expressions**
+
+JQ expressions allow filtering based on values, not just structural path.
+
+Example: **Ignore init containers named `injected-init-container`:**
+
+```yaml
+spec:
+  ignoreDifferences:
+  - group: ""
+    kind: Pod
+    jqPathExpressions:
+    - .spec.initContainers[] | select(.name == "injected-init-container")
+```
+
+---
+
+### **3. Ignoring Fields Managed by Specific Controllers**
+
+Kubernetes stores metadata about who manages each field in `.metadata.managedFields`.
+
+Example: **Ignore fields owned by `kubectl` manager:**
+
+```yaml
+spec:
+  ignoreDifferences:
+  - group: "*"
+    kind: "*"
+    managedFieldsManagers:
+    - kubectl
+```
+
+This means Argo CD will ignore differences for all fields managed by `kubectl`.
+
+---
+
+## **Summary**
+
+* Argo CD continuously compares desired vs live state and may detect drift even after successful sync.
+* Differences can occur due to webhooks, operators, random Helm configurations, or manifest errors.
+* Argo CD allows customizing diff behavior using:
+
+  * JSON pointers
+  * JQ path expressions
+  * Managed fields manager filtering
+* Diff customization can be configured at the **application** or **system** scope.

@@ -1,0 +1,223 @@
+# **Registering Private Git Repositories in Argo CD**
+
+In this lecture, we will explore how to **register private Git repositories in Argo CD**, also referred to as **RBCD** in some contexts. While previous examples used public repositories—which can be accessed directly without authentication—private repositories require additional configuration before they can be used by your Argo CD applications.
+
+Argo CD supports several authentication methods for private repositories. Once registered, Argo CD stores repository credentials as a standard **Kubernetes Secret**, allowing both declarative configurations and UI/CLI-based registration.
+
+---
+
+## **1. Supported Authentication Methods**
+
+Argo CD supports connecting to private Git repositories using multiple authentication mechanisms:
+
+### **1.1 HTTPS Authentication**
+
+You can authenticate using:
+
+* **Username and Password**
+* **Personal Access Token (PAT)**
+* **Repository HTTPS URL**
+
+This method is commonly used with:
+
+* GitHub
+* GitLab
+* Bitbucket
+* Azure DevOps
+* Any Git server with HTTP/S authentication
+
+---
+
+### **1.2 SSH Authentication**
+
+Argo CD supports SSH-based access for Git repositories.
+You need to provide:
+
+* The **SSH private key**
+* The Git repository **SSH URL** (e.g., `git@github.com:user/repo.git`)
+
+This is often used for:
+
+* GitHub
+* GitLab
+* Self-hosted Git servers
+
+---
+
+### **1.3 GitHub App Authentication**
+
+If your repositories are hosted in **GitHub** or **GitHub Enterprise**, Argo CD supports authenticating using **GitHub Apps**.
+
+You must supply:
+
+* **GitHub App ID**
+* **GitHub App Installation ID**
+* **Private Key (PEM)**
+
+This method provides secure, fine-grained credentials and is recommended for enterprise usage.
+
+---
+
+## **2. How Argo CD Stores Repository Credentials**
+
+Argo CD stores repository information as a **Kubernetes Secret** with:
+
+* Specific annotations
+* Key/value pairs that define authentication and configuration
+
+This allows credentials to be managed through:
+
+* **Declarative YAML manifests**
+* **Argo CD CLI (`argocd repo add`)**
+* **Argo CD Web UI**
+
+---
+
+## **3. Registering Private Repositories Declaratively**
+
+Below is the structure of a Kubernetes Secret used to define a Git repository in Argo CD.
+
+### **3.1 Example: HTTPS Authentication**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-private-repo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/your-org/private-repo.git
+  username: your-username
+  password: your-access-token
+  insecure: "false"   # Set to "true" to skip certificate verification
+```
+
+### Notes:
+
+* `type: git` tells Argo CD that this is a Git repository.
+* `insecure: "true"` allows bypassing TLS validation (not recommended for production).
+* Use `stringData` for unencoded values; Argo CD will convert them into base64 automatically.
+
+---
+
+## **3.2 Adding TLS Client Certificates (Optional)**
+
+Some Git servers require TLS client certificate authentication.
+You can provide:
+
+```yaml
+stringData:
+  tlsClientCertData: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+  tlsClientCertKey: |
+    -----BEGIN PRIVATE KEY-----
+    ...
+    -----END PRIVATE KEY-----
+```
+
+---
+
+## **3.3 Example: SSH Authentication**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-ssh-repo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: git@github.com:your-org/private-repo.git
+  sshPrivateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    ...
+    -----END OPENSSH PRIVATE KEY-----
+```
+
+### Notes:
+
+* Argo CD automatically generates known_hosts entries.
+* Ensure your SSH key has read access to the repository.
+
+---
+
+## **3.4 Example: GitHub App Authentication**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-app-repo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/your-org/private-repo
+  githubAppID: "12345"
+  githubAppInstallationID: "67890"
+  githubAppPrivateKey: |
+    -----BEGIN RSA PRIVATE KEY-----
+    ...
+    -----END RSA PRIVATE KEY-----
+```
+
+### Notes:
+
+* Use the App's Installation ID assigned after installation.
+* Private key must match the GitHub App configuration.
+
+---
+
+## **4. Registering Repositories Using the CLI**
+
+```bash
+argocd repo add https://github.com/your/private-repo \
+  --username <USER> \
+  --password <TOKEN>
+```
+
+Or for SSH:
+
+```bash
+argocd repo add git@github.com:your/private-repo.git \
+  --ssh-private-key-path ~/.ssh/id_rsa
+```
+
+---
+
+## **5. Registering Repositories via Web UI**
+
+Navigate to:
+
+**Argo CD UI → Settings → Repositories → Connect Repo**
+
+Fill in:
+
+* Repo URL
+* Authentication method (HTTPS / SSH / GitHub App)
+* Credentials
+
+---
+
+## **6. Summary**
+
+Private repository registration in Argo CD allows secure access to Git sources. Argo CD supports:
+
+| Method     | Credentials                          | Notes                                   |
+| ---------- | ------------------------------------ | --------------------------------------- |
+| HTTPS      | Username/password or token           | Easiest to configure                    |
+| SSH        | SSH private key                      | Most secure for standard Git servers    |
+| GitHub App | App ID, Installation ID, Private Key | Best for GitHub Enterprise environments |
+
+All repository connections are stored as **Kubernetes Secrets**, and can be managed declaratively, via CLI, or through the UI.

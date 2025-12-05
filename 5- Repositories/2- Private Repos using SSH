@@ -1,0 +1,177 @@
+# **Connecting Private Git Repositories via SSH in Argo CD and Deploying an Application**
+
+This guide explains how to connect Argo CD to a private Git repository using **SSH authentication**, how to define the SSH key declaratively using a Kubernetes Secret, and finally how to create and deploy an Argo CD application using that private repository as the source of manifests.
+
+---
+
+## **1. Overview**
+
+Argo CD supports accessing Git repositories using several authentication methods. In this example, we will use **SSH keys** to connect to a private GitHub repository. We will:
+
+1. Generate an SSH key pair
+2. Upload the **public key** to GitHub
+3. Create a **Kubernetes Secret** containing the private key
+4. Register the repository declaratively
+5. Verify the repository connection in the Argo CD UI
+6. Create an Argo CD application that uses the SSH repository
+7. Deploy (sync) the application
+
+---
+
+## **2. Generate and Upload the SSH Key**
+
+1. Create an SSH key pair (example):
+
+   ```bash
+   ssh-keygen -t ed25519 -C "argocd-repo-key"
+   ```
+
+   This generates:
+
+   * `id_ed25519` (private key)
+   * `id_ed25519.pub` (public key)
+
+2. Go to **GitHub → Repository Settings → Deploy Keys**
+
+3. Add the content of `id_ed25519.pub`
+
+4. Enable **Allow write access** if needed
+
+---
+
+## **3. Create the Argo CD Repository Secret**
+
+Argo CD allows registering Git repositories declaratively using Kubernetes Secrets.
+
+### Important Notes
+
+* The label **`argocd.argoproj.io/secret-type: repository`** is required.
+* **SSH URLs differ from HTTPS URLs**.
+  Example:
+
+  * HTTPS: `https://github.com/user/repo.git`
+  * SSH: `git@github.com:user/repo.git`
+
+### Example Secret Definition
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: private-repo-ssh
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  url: git@github.com:your-user/your-private-repo.git
+  sshPrivateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    YOUR-PRIVATE-KEY-HERE
+    -----END OPENSSH PRIVATE KEY-----
+```
+
+### Apply the Secret
+
+```bash
+kubectl apply -f private-repo-ssh.yaml
+```
+
+### Verify the Secret
+
+```bash
+kubectl get secret private-repo-ssh -n argocd
+```
+
+---
+
+## **4. Verify Repository Connection in Argo CD UI**
+
+1. Open Argo CD Web UI
+2. Go to **Settings → Repositories**
+3. You should now see:
+
+   * Your existing HTTPS repo
+   * Your new SSH repo
+4. The **status** should show **Connected** or **Successful**
+
+If the connection fails:
+
+* Ensure the SSH URL is correct
+* Make sure the private key is valid
+* Verify the public key exists in GitHub deploy keys
+* Ensure GitHub deploy key has read access
+
+---
+
+## **5. Create an Argo CD Application Using the SSH Repo**
+
+Create a new Application manifest referencing the SSH repository URL.
+
+### Example Application
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook-ssh
+  namespace: argocd
+spec:
+  destination:
+    namespace: guestbook
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: git@github.com:your-user/your-private-repo.git
+    path: guestbook
+    targetRevision: HEAD
+  syncPolicy:
+    automated: {}
+```
+
+Apply the application:
+
+```bash
+kubectl apply -f guestbook-ssh.yaml
+```
+
+---
+
+## **6. Check Application Status**
+
+```bash
+kubectl get applications -n argocd
+```
+
+You will likely see:
+
+* **OutOfSync** — means Argo CD found differences and requires syncing.
+
+---
+
+## **7. Sync the Application in Argo CD UI**
+
+1. Open Argo CD UI
+2. Go to **Applications**
+3. Select **guestbook-ssh**
+4. Click **Sync**
+5. Watch Argo CD create the Kubernetes resources in real time
+
+After syncing:
+
+* The status should show **Healthy** and **Synced**
+* The target namespace (e.g., `guestbook`) will contain the deployed resources
+
+---
+
+## **8. Summary**
+
+By following this guide, you have successfully:
+
+* Generated and uploaded an SSH key pair to GitHub
+* Defined a repository Secret for Argo CD using the SSH private key
+* Registered the private Git repository declaratively
+* Verified successful repository connection in the UI
+* Created and synced an Argo CD application using the SSH repository
+
+This process allows secure, automated access to private Git repositories and supports GitOps workflows using Argo CD.

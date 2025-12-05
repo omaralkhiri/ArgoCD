@@ -1,0 +1,113 @@
+# **Understanding Why We Need RBCD Projects**
+
+This document explains the purpose of **projects in RBCD** (Repository-Based Continuous Delivery) and how they help organize, secure, and manage application deployments across teams and environments.
+
+---
+
+## **1. What Are Projects in RBCD?**
+
+Projects in RBCD provide a **logical grouping mechanism** for applications.
+They allow you to organize multiple applications under a single unit called a “project,” which helps in controlling access, defining deployment rules, and specifying resource usage boundaries.
+
+For example, if you have application **App1**, **App2**, **App3**, and **App4**, you can group them into one project. This helps you manage the applications as a set rather than individually.
+
+---
+
+## **2. Why Are Projects Needed?**
+
+Projects are mandatory in RBCD because they add essential control and security layers in environments where multiple teams work with the same RBCD installation. They help in:
+
+### **A. Logical Grouping**
+
+* Applications can be grouped meaningfully.
+* Easier management and clearer structure.
+* Improves multi-team workflows.
+
+### **B. Access Restrictions**
+
+* You can define **which teams** can view, modify, or deploy applications within a project.
+* Helps prevent unauthorized access to specific applications.
+
+### **C. Git Repository Restrictions**
+
+* A project can restrict **which Git repositories** its applications are allowed to reference.
+* This prevents deployment from untrusted or unintended sources.
+
+### **D. Deployment Destination Restrictions**
+
+You can restrict:
+
+* **Destination clusters**
+* **Namespaces**
+
+This ensures that applications in a project can only deploy to **approved environments**, improving both security and compliance.
+
+---
+
+## **3. Resource Usage and Creation Rules**
+
+Projects also allow you to specify **resource usage boundaries**, such as:
+
+* What Kubernetes resources can be created (e.g., Deployments, Services, ConfigMaps).
+* Limits around resource consumption in destination clusters.
+
+This feature prevents accidental or unauthorized creation of resources outside the project’s scope.
+
+---
+
+## **4. Project Rules and Policies**
+
+A key feature of RBCD projects is **Project Rules**, which allow you to define sets of permissions—called **policies**—that can be granted to different users or systems. These rules control how external entities interact with project applications.
+
+### **Two Main Use Cases:**
+
+#### **A. Granting CI Systems Limited Access**
+
+You can create a rule that allows a CI/CD system to:
+
+* Sync applications
+* Perform specific automated actions
+  This is typically done by associating the rule with a **JSON Web Token (JWT)**.
+
+This setup ensures automation tools have the access they need—but no more.
+
+#### **B. Granting OIDC Groups Access**
+
+You can assign permissions to identity provider groups, such as:
+
+* GitHub Groups
+* GitLab Groups
+* Other OIDC-supported identity sources
+
+Example roles you can grant:
+
+* **Read-only** access to applications
+* Permission to **sync** applications
+* Access to manage specific resources depending on the policy
+
+This makes it easy to provide team-based access control.
+
+---
+
+## **5. Default Project**
+
+When RBCD is installed, it creates a **default project** automatically.
+While this can be used for experimentation, **it is recommended to create your own custom projects** because:
+
+* They offer meaningful naming conventions.
+* They enable clearer organization.
+* They allow more precise access and resource control.
+
+---
+
+## **Conclusion**
+
+RBCD projects are a core component of managing applications efficiently and securely. They provide:
+
+* Logical grouping
+* Access and repository restrictions
+* Deployment environment control
+* Resource usage boundaries
+* Fine-grained permission rules
+
+Using well-structured projects is essential when working in multi-team environments, ensuring proper access control, organization, and consistency across deployments.

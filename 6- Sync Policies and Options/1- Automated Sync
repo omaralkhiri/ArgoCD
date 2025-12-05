@@ -1,0 +1,104 @@
+# **Argo CD Automated Syncing – Detailed Documentation**
+
+## **Overview**
+
+Argo CD continuously monitors and compares the desired application state stored in a Git repository with the live state running in a Kubernetes cluster. By default, Argo CD performs a state comparison (diff check) every **three minutes**. If it detects that the application in the cluster is out of sync with the Git repository, Argo CD supports an **Automated Sync** feature that can automatically reconcile the differences without requiring manual intervention.
+
+Automated Sync allows Git to act as the **single source of truth**, enabling true **GitOps** workflows while eliminating the need for CI/CD systems to directly interact with the Kubernetes cluster or Argo CD API.
+
+---
+
+## **Key Benefits of Automated Sync**
+
+* Ensures applications always match the Git-defined desired state.
+* Removes the need for manual intervention or manual sync operations.
+* Reduces operational risks by enforcing consistency.
+* Avoids granting external CI/CD systems direct access to Argo CD or Kubernetes.
+
+---
+
+## **Important Notes and Behaviors**
+
+1. **Automated Sync runs only when the application becomes *OutOfSync*.**
+
+   * If there is no detected change or drift, an automated sync will not be triggered.
+
+2. **Automated Sync will not retry failed sync attempts.**
+
+   * If a sync fails for a given commit or revision, Argo CD will **not automatically retry** unless new changes are pushed to the repository.
+
+3. **Rollback limitations apply.**
+
+   * When automated sync is enabled, **automatic rollback is not supported** for failed sync events.
+   * Rollbacks must be performed manually unless additional advanced sync options like *self-heal* and *prune* are configured.
+
+---
+
+## **Configuring Automated Sync Using Declarative YAML**
+
+The automated sync feature can be enabled within the Argo CD Application manifest using the `spec.syncPolicy` section:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: <application-name>
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: <git-repo-url>
+    targetRevision: <revision>
+    path: <application-path>
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: <target-namespace>
+  syncPolicy:
+    automated: {}
+```
+
+### **Optional automated sync enhancements**
+
+```yaml
+syncPolicy:
+  automated:
+    prune: true       # Deletes cluster resources removed from Git
+    selfHeal: true    # Automatically corrects drift directly in cluster
+```
+
+---
+
+## **Enabling Automated Sync via CLI**
+
+To create a new application with automated sync enabled using the Argo CD CLI:
+
+```bash
+argocd app create <app-name> \
+  --repo <git-repo-url> \
+  --path <path> \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace <namespace> \
+  --sync-policy automated
+```
+
+---
+
+## **Enabling Through Argo CD Web UI**
+
+1. Open Argo CD Web Interface.
+2. Navigate to **Applications → New App**.
+3. Scroll to the **Sync Policy** section.
+4. Choose one of the following:
+
+   * **Manual**
+   * **Automatic**
+5. Optionally enable:
+
+   * **Self Heal**
+   * **Prune**
+
+---
+
+## **Conclusion**
+
+Automated Sync is a core GitOps capability provided by Argo CD that keeps application deployments aligned with the desired configuration defined in Git. By enabling automated syncing, teams benefit from continuous delivery without the need for manual sync operations or direct pipeline integration.

@@ -1,0 +1,157 @@
+## 📘 **Argo CD Sync Options – Detailed Documentation**
+
+Argo CD provides several sync options that allow users to control how application resources are synchronized between the **desired state (Git)** and the **live state (target Kubernetes cluster)**. These options can be configured at:
+
+* **Application level** → using `.spec.syncPolicy.syncOptions`
+* **Resource level** → using Kubernetes annotations under metadata
+
+This documentation explains each sync option, its purpose, and how to apply it.
+
+---
+
+## 1️⃣ **Disable Pruning (`Prune=false`)**
+
+By default, when a resource is deleted from Git, Argo CD deletes it from the cluster during sync.
+The **no-prune** option prevents Argo CD from deleting the resource.
+
+### 🔹 Behavior
+
+* Resource will not be deleted even if removed from Git.
+* Application will remain **OutOfSync**.
+
+### 🔹 Application Level
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - Prune=false
+```
+
+### 🔹 Resource Level Annotation
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+```
+
+---
+
+## 2️⃣ **Disable Kubectl Validation (`Validate=false`)**
+
+Argo CD uses `kubectl apply` with schema validation enabled.
+If you want to skip manifest validation, you can disable it.
+
+### 🔹 Application Level
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - Validate=false
+```
+
+### 🔹 Resource Level Annotation
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Validate=false
+```
+
+---
+
+## 3️⃣ **Selective Sync (`ApplyOutOfSyncOnly=true`)**
+
+By default, Argo CD applies **all resources** during sync, even if they are not changed.
+
+Selective sync enables syncing **only resources that are OutOfSync**, which is useful for very large application manifests.
+
+### 🔹 Application Level Only
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+```
+
+---
+
+## 4️⃣ **Prune Last (`PruneLast=true`)**
+
+Argo CD supports syncing resources in **waves**.
+If you need certain resources to be pruned **after all other sync waves**, use `PruneLast`.
+
+### 🔹 Application Level
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - PruneLast=true
+```
+
+### 🔹 Resource Level Annotation
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: PruneLast=true
+```
+
+---
+
+## 5️⃣ **Replace Resources (`Replace=true`)**
+
+Normally Argo CD uses `kubectl apply` to patch existing resources.
+Using `Replace=true` forces resource recreation — similar to `kubectl replace`.
+
+### 🔹 Application Level
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - Replace=true
+```
+
+### 🔹 Resource Level Annotation
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
+```
+
+---
+
+## 6️⃣ **Fail on Shared Resources (`FailOnSharedResource=true`)**
+
+By default, Argo CD allows multiple applications to manage the same Kubernetes resource, but it shows a warning only.
+
+To **fail the sync operation** instead of allowing shared ownership, use:
+
+### 🔹 Application Level Only
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - FailOnSharedResource=true
+```
+
+---
+
+## 🧩 Summary Table
+
+| Option                      | Description                                  | Level Supported |
+| --------------------------- | -------------------------------------------- | --------------- |
+| `Prune=false`               | Prevent deleting resources removed from Git  | App, Resource   |
+| `Validate=false`            | Skip schema validation during apply          | App, Resource   |
+| `ApplyOutOfSyncOnly=true`   | Sync only OutOfSync resources                | App only        |
+| `PruneLast=true`            | Prune after all sync waves                   | App, Resource   |
+| `Replace=true`              | Replace resource instead of patching         | App, Resource   |
+| `FailOnSharedResource=true` | Fail sync if resource managed by another app | App only        |
+

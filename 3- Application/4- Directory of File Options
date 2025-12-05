@@ -1,0 +1,140 @@
+## **1. Supported Directory Types**
+
+RVCD supports the following types of file directories:
+
+### **1.1 YAML Directory**
+
+You can provide a directory that contains one or more `.yaml` or `.yml` files.
+RVCD will load, process, deploy, and sync all YAML files found in the directory.
+
+### **1.2 Jsonnet Directory**
+
+RVCD also supports directories containing `.jsonnet` files.
+These directories can include:
+
+* Single-level files
+* Multiple subdirectories (if recursion is enabled)
+* Jsonnet external variables
+* Jsonnet top-level arguments
+
+---
+
+## **2. Recursive Directory Processing**
+
+If you want RVCD to automatically detect and include *all* files inside subdirectories, you can enable the recursive option.
+
+### **2.1 Enabling Recursion**
+
+In the directory configuration section, set:
+
+```yaml
+directory:
+  path: ./path/to/your/files
+  recurse: true
+```
+
+### **What This Does**
+
+When `recurse: true` is enabled, RVCD:
+
+* Scans the provided folder and **all nested subfolders**
+* Loads **every YAML and Jsonnet file** inside them
+* Deploys and synchronizes **all** discovered files automatically
+
+This is useful when your configurations are organized into multiple levels of folders.
+
+---
+
+## **3. Jsonnet Configuration Options**
+
+When working with Jsonnet files, RVCD provides two important configuration options:
+
+* **External variables**
+* **Top-level arguments**
+
+Both options allow you to parameterize and customize your Jsonnet templates.
+
+---
+
+## **3.1 Jsonnet External Variables**
+
+External variables are values passed into Jsonnet files using `extVar`.
+These variables can be referenced inside your Jsonnet code.
+
+### **Example YAML configuration**
+
+```yaml
+jsonnet:
+  extVars:
+    environment: "production"
+    region: "eu-central-1"
+```
+
+### **Usage inside Jsonnet**
+
+```jsonnet
+local env = std.extVar("environment");
+local region = std.extVar("region");
+
+{
+  environment: env,
+  region: region,
+}
+```
+
+---
+
+## **3.2 Jsonnet Top-Level Arguments**
+
+Top-level arguments (`--tla`) allow you to pass structured data or values that your Jsonnet files can use at render time.
+
+### **Example YAML configuration**
+
+```yaml
+jsonnet:
+  tlaVars:
+    replicas: 3
+    appName: "my-service"
+```
+
+### **Usage inside Jsonnet**
+
+```jsonnet
+local replicas = std.tlaVar("replicas");
+local name = std.tlaVar("appName");
+
+{
+  app: name,
+  replicas: replicas,
+}
+```
+
+---
+
+## **4. Putting It All Together**
+
+Here is a combined example showing directory configuration, recursive scanning, Jsonnet external variables, and top-level arguments:
+
+```yaml
+directory:
+  path: ./configs
+  recurse: true
+
+jsonnet:
+  extVars:
+    cluster: "prod-cluster"
+    owner: "team-alpha"
+
+  tlaVars:
+    version: "v1.2.3"
+    enabled: true
+```
+
+---
+
+## **5. Summary**
+
+* RVCD works with directories containing **YAML** or **Jsonnet** files.
+* Use `recurse: true` to include all files from subdirectories automatically.
+* Jsonnet directories can use external variables (`extVars`) and top-level arguments (`tlaVars`).
+* These features help you build flexible, parameterized configurations that deploy cleanly across environments.

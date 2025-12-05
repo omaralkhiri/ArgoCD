@@ -1,0 +1,198 @@
+# **Documentation: Registering Public & Private Helm Repositories in Argo CD (RBCD)**
+
+This document explains how to work with Helm repositories in **Argo CD (RBCD)**, including how to register **public**, **non-standard**, and **private** Helm repositories using different supported methods: **declarative manifests**, **CLI**, and the **Web UI**.
+
+---
+
+## ## **1. Overview of Helm Repositories in Argo CD**
+
+Argo CD supports pulling application manifests from Helm chart repositories. Depending on the repository type and authentication requirements, some repos can be used directly, while others need explicit registration.
+
+### **Types of Helm Repositories:**
+
+| Type                               | Requires Registration? | Notes                                                                                                    |
+| ---------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Public standard Helm repos**     | No                     | You can reference them directly in an Application manifest. Example: Bitnami, Prometheus community repo. |
+| **Public non-standard Helm repos** | **Yes**                | Repos not hosted in default Helm format or requiring additional configuration.                           |
+| **Private Helm repos**             | **Yes**                | Must be registered with authentication before usage.                                                     |
+
+Argo CD supports authentication using:
+
+* **Username + Password**
+* **TLS Client Certificate + Key**
+* **Custom CA certificates**
+
+---
+
+## ## **2. Supported Methods to Register Helm Repositories**
+
+Argo CD supports three methods to register Helm repos:
+
+1. **Declarative (Kubernetes Secret manifests)**
+2. **Argo CD CLI**
+3. **Argo CD Web UI**
+
+---
+
+## ## **3. Registering Helm Repositories Declaratively**
+
+Using the declarative method, you define a standard Kubernetes Secret representing the repository. Argo CD automatically picks it up when the secret is labeled correctly.
+
+### ### **3.1 Required Labels**
+
+The secret must include:
+
+```yaml
+argocd.argoproj.io/secret-type: repository
+```
+
+### ### **3.2 Required Data Fields**
+
+| Field                          | Description                                         |
+| ------------------------------ | --------------------------------------------------- |
+| `type`                         | Must be `helm`                                      |
+| `name`                         | **Mandatory** – the name assigned to your Helm repo |
+| `url`                          | Repository endpoint                                 |
+| `username` (optional)          | Username for private repos                          |
+| `password` (optional)          | Password or token for private repos                 |
+| `tlsClientCertData` (optional) | TLS certificate (base64)                            |
+| `tlsClientCertKey` (optional)  | TLS key (base64)                                    |
+
+> **Note:** All values in the `data:` section must be base64-encoded.
+
+---
+
+### ### **3.3 Example: Public Helm Repository (Declarative)**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: public-helm-repo
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+data:
+  type: aGVsbQ==          # "helm"
+  name: cHVibGljLXJlcG8=  # "public-repo"
+  url: aHR0cHM6Ly9jaGFydHMuYnRzaC5pby8=  # "https://charts.bitnami.com/"
+```
+
+---
+
+### ### **3.4 Example: Private Helm Repository With Credentials**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: private-helm-repo
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+data:
+  type: aGVsbQ==                            # "helm"
+  name: cHJpdmF0ZS1yZXBv                    # "private-repo"
+  url: aHR0cHM6Ly9naXRleGFtcGxlLmNvbS9jaGFydHM=  # repo URL
+  username: YWRtaW4=                        # "admin"
+  password: c2VjcmV0UGFzcw==                # "secretPass"
+```
+
+---
+
+## ## **4. Registering Helm Repositories Using the Argo CD CLI**
+
+You can register repositories directly from the CLI using the `argocd repo add` command.
+
+### ### **4.1 Command Format**
+
+```bash
+argocd repo add <repo-url> \
+  --type helm \
+  --name <repo-name> \
+  [--username <USERNAME>] \
+  [--password <PASSWORD>] \
+  [--tls-client-cert-path <path>] \
+  [--tls-client-cert-key-path <path>]
+```
+
+---
+
+### ### **4.2 Example: Adding a Public Repo via CLI**
+
+```bash
+argocd repo add https://charts.bitnami.com/bitnami \
+  --type helm \
+  --name bitnami
+```
+
+---
+
+### ### **4.3 Example: Adding a Private Repo via CLI**
+
+```bash
+argocd repo add https://git.example.com/charts \
+  --type helm \
+  --name private-helm \
+  --username admin \
+  --password secretPass
+```
+
+---
+
+## ## **5. Registering Helm Repositories Using the Argo CD Web UI**
+
+You can add repositories via the RBCD (Argo CD) dashboard.
+
+### ### **Steps:**
+
+1. Open the Argo CD UI.
+2. Navigate to **Settings → Repositories**.
+3. Click **+ New Repository**.
+4. Set **Repository Type = Helm**.
+5. Fill in the following fields:
+
+   * **Name**
+   * **URL**
+   * **Username & Password** (for private repos)
+   * TLS certificate info (if needed)
+6. Click **Create**.
+
+The repository will immediately appear in the list and can be referenced in Applications.
+
+---
+
+## ## **6. Using the Registered Helm Repo in an Application**
+
+Once registered, you reference the repo by **name** in your Application manifest.
+
+### ### Example:
+
+```yaml
+spec:
+  source:
+    repoURL: private-helm     # use the repo name
+    chart: mychart
+    targetRevision: 1.0.0
+```
+
+---
+
+# **Summary**
+
+Argo CD supports public, non-standard, and private Helm repositories.
+Private and custom repos **must be registered** before use.
+
+### **You can register Helm repos using:**
+
+* **Declarative Kubernetes Secrets**
+* **Argo CD CLI (`argocd repo add`)**
+* **Argo CD Web UI**
+
+For declarative registration:
+
+* Use a Secret with label:
+  `argocd.argoproj.io/secret-type: repository`
+* Set `type: helm`
+* Always specify `name`
+* Provide authentication fields for private repos

@@ -1,0 +1,102 @@
+# **Argo CD Applications**
+
+## **Overview**
+
+An **Argo CD Application** is a Kubernetes resource object that defines how and where your application should be deployed. It is stored in the Kubernetes **etcd** database and managed through Argo CD.
+
+Each Argo CD Application is defined by two main components:
+
+* **Source** – The location of the application manifests (e.g., a Git repository).
+* **Destination** – The target Kubernetes cluster and namespace where the application will be deployed.
+
+---
+
+## **Creating Applications**
+
+Argo CD supports three main methods for creating applications:
+
+### **1. Declarative Approach (Recommended)**
+
+The declarative approach uses YAML manifests to define applications.
+This is the **recommended method** as it enables you to:
+
+* Store your application definitions in Git (GitOps approach).
+* Version-control your deployments.
+* Easily manage and reproduce environments.
+
+Argo CD provides **Custom Resource Definitions (CRDs)** to create Applications and Projects.
+
+A basic example of an Argo CD Application manifest:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd  # Must be the same namespace where Argo CD is installed
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/example/repo.git
+    targetRevision: main   # Branch, tag, or commit ID
+    path: manifests/       # Directory containing your manifests or Helm chart
+  destination:
+    server: https://kubernetes.default.svc  # Target cluster
+    namespace: my-namespace
+  syncPolicy:
+    automated: {}  # Optional: enable auto-sync
+```
+
+**Key fields:**
+
+* **metadata.name** – Name of the application.
+* **metadata.namespace** – Namespace where Argo CD runs.
+* **spec.project** – Defines which Argo CD project this application belongs to (default if not custom).
+* **spec.source** – Repository details (URL, revision, and path).
+* **spec.destination** – Deployment target (cluster and namespace).
+
+---
+
+### **2. Web UI Approach**
+
+You can also create applications using the Argo CD **Web UI**:
+
+1. Open the Argo CD dashboard.
+2. Click **“New App”**.
+3. Fill in the following fields:
+
+   * **Application Name**
+   * **Project**
+   * **Repository URL**
+   * **Revision** (branch, tag, or commit)
+   * **Path** (directory of manifests or Helm chart)
+   * **Destination Cluster**
+   * **Namespace**
+4. Click **Create** to deploy the application.
+
+---
+
+### **3. CLI Approach**
+
+The Argo CD CLI provides a command-line method to create applications with the same parameters.
+Example command:
+
+```bash
+argocd app create my-app \
+  --repo https://github.com/example/repo.git \
+  --path manifests \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace my-namespace \
+  --project default
+```
+
+This command defines the same configuration as the declarative YAML but allows faster creation via CLI.
+
+---
+
+## **Summary**
+
+* Argo CD Applications define **what** and **where** to deploy.
+* The **declarative YAML approach** is the preferred method for production (GitOps best practice).
+* Applications can also be created using the **Web UI** or **CLI**.
+* Always ensure the **namespace** matches the Argo CD installation namespace.

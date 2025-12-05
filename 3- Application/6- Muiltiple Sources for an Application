@@ -1,0 +1,196 @@
+# **Argo CD – Multiple Sources per Application (Introduced in v2.6)**
+
+## **Overview**
+
+Prior to **Argo CD v2.6**, each Application resource could reference **only a single source**, which could be either:
+
+* A Git repository
+* A Helm chart repository
+
+This meant that if your workload required resources stored across multiple repositories, you were forced to create multiple Argo CD Applications.
+
+Starting from **Argo CD v2.6**, a new field called **`sources`** allows defining **multiple sources** within a single Application. This enables you to combine and deploy related resources coming from:
+
+* Multiple Git repositories
+* Multiple Helm chart repositories
+* A mix of Git + Helm + other supported sources
+
+This feature simplifies deployments, reduces the number of Applications needed, and helps you logically group related components.
+
+---
+
+# **Why Multiple Sources?**
+
+Multiple sources enable a single Application to manage components that are logically related but stored in different repositories. Common use cases include:
+
+### **1. Combining Related Helm Charts**
+
+Example: Deploying Redis alongside its Prometheus Exporter.
+
+* Source 1 → Redis Helm chart
+* Source 2 → Redis Prometheus Exporter chart
+
+Instead of maintaining two separate Applications, both charts are defined under a single Application using the `sources` field.
+
+---
+
+### **2. Using a Remote Helm Chart with a Git-Based Values File**
+
+A very common scenario is:
+
+* The Helm chart is hosted remotely (e.g., Ingress NGINX chart)
+* The values file is inside your own Git repository
+
+With multiple sources:
+
+* **Source 1** → Remote Helm chart
+* **Source 2** → Your Git repo containing values.yaml
+
+You can reference the Git-based values file using a `ref` identifier.
+
+---
+
+# **How It Works**
+
+## **The `sources` Field**
+
+To enable multi-source behavior, Argo CD introduces the **`spec.sources`** field inside an Application manifest.
+
+Example structure:
+
+```yaml
+spec:
+  sources:
+    - <source definition 1>
+    - <source definition 2>
+    ...
+```
+
+> **Note:** If both `source` (singular) and `sources` are defined, Argo CD **ignores** `source` and only uses `sources`.
+
+---
+
+# **Use Case Examples**
+
+## **Example 1: Deploying Redis + Redis Exporter in One Application**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis-with-exporter
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  sources:
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: redis
+      targetRevision: 17.3.0
+
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: prometheus-redis-exporter
+      targetRevision: 4.5.0
+
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+This results in:
+
+* One Argo CD Application
+* Two Helm charts applied together
+* A single synchronized deployment process
+
+---
+
+## **Example 2: Combining a Remote Helm Chart With Git-Based Values File**
+
+Deploying **Ingress NGINX** from a remote Helm repo while providing custom values stored in Git.
+
+### **Application Definition**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+
+  sources:
+    # Source 1: Remote Helm Chart
+    - repoURL: https://kubernetes.github.io/ingress-nginx
+      chart: ingress-nginx
+      targetRevision: 4.9.0
+      helm:
+        valueFiles:
+          - "$values/ingress-nginx/values.yaml"
+
+    # Source 2: Git repo containing custom values
+    - repoURL: https://github.com/my-org/my-configs.git
+      targetRevision: master
+      ref: values
+
+  project: default
+```
+
+### **How it Works**
+
+* `ref: values` assigns a reference name to the Git source.
+* In Helm configuration:
+
+  ```
+  "$values/ingress-nginx/values.yaml"
+  ```
+
+  means:
+
+  * `values` → the Git repo (Source #2)
+  * `/ingress-nginx/values.yaml` → file path on that repo
+
+Argo CD merges the remote Helm chart with the custom values from Git during rendering.
+
+---
+
+# **Resource Override Behavior**
+
+When multiple sources generate the **same Kubernetes resource** (same *kind*, *name*, *namespace*):
+
+### **Argo CD applies the **last resource** that appears in the `sources` list.**
+
+This is useful for:
+
+* Overriding resources provided by Helm charts
+* Replacing default manifests with custom Git-based definitions
+
+Example:
+If a remote Helm chart creates a `Service` named `redis`, you can override it by declaring another `Service` with the same name in a Git repo **placed later in the sources list**.
+
+---
+
+# **Important Notes**
+
+### ✔ Use `sources` for Multi-Source Applications
+
+### ✔ `source` is ignored if `sources` is present
+
+### ✔ Ordering matters (later sources override earlier ones)
+
+### ✔ Supports Git, Helm, and other repository types
+
+---
+
+# **Summary**
+
+Argo CD 2.6 introduces a powerful feature allowing you to define **multiple sources** within a single Application. This enhancement enables:
+
+* Combining charts + Git values
+* Grouping related components into one unified Application
+* Overriding remote chart resources with custom definitions
+* Simplifying complex multi-repository deployments

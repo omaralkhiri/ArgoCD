@@ -1,0 +1,127 @@
+# 📘 Argo CD – Managing and Defining Kubernetes Clusters
+
+## 🚀 Introduction
+
+Argo CD is a declarative, GitOps-based continuous delivery tool for Kubernetes. It can deploy application manifests to:
+
+1. **The local cluster** where Argo CD itself runs
+2. **Remote Kubernetes clusters**
+
+By default, Argo CD already has access to the cluster it is deployed into. To deploy to additional clusters, we must explicitly register them inside Argo CD.
+
+---
+
+## 💾 Registering Remote Clusters
+
+Remote clusters are registered in Argo CD by storing their connection details as Kubernetes Secrets inside the Argo CD namespace (commonly `argocd`).
+
+Each cluster secret must follow these rules:
+
+* Type: standard Kubernetes **Secret**
+* Must include the label:
+
+  ```
+  argocd.argoproj.io/secret-type: cluster
+  ```
+* Must contain required connection details (name, API server URL, and authentication config)
+
+---
+
+## 🔐 Secret Data Requirements
+
+A cluster secret must include:
+
+| Field                   | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `name`                  | Logical name for the cluster                  |
+| `server`                | Kubernetes API server URL                     |
+| `config`                | Authentication configuration (base64-encoded) |
+| `namespaces` (optional) | Limits access to specific namespaces          |
+
+---
+
+## 🔑 Authentication Methods
+
+Argo CD supports several authentication mechanisms when accessing remote clusters:
+
+| Method                              | Description                                        |
+| ----------------------------------- | -------------------------------------------------- |
+| **Basic Auth (Username/Password)**  | Simple auth method, not recommended for production |
+| **Bearer Token (Service Account)**  | Uses Kubernetes ServiceAccount token and RBAC      |
+| **IAM Authentication**              | Used in cloud environments (AWS, GKE, AKS, etc.)   |
+| **External Provider / Exec Plugin** | Uses external CLI (e.g., `gcloud`, `aws`, `vault`) |
+
+---
+
+## 📦 Declarative Cluster Secret Example
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-remote-cluster
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+type: Opaque
+data:
+  name: bXktcmVtb3RlLWNsdXN0ZXI=            # base64("my-remote-cluster")
+  server: aHR0cHM6Ly8xMC4wLjAuMTA6NjQ0Mw== # base64("https://10.0.0.10:6443")
+  config: |
+    ewogICJ0b2tlbiI6ICJhYmNkZWYxMjM0NSIsCiAgIm5hbWVzcGFjZXMiOiBbICJkZWZhdWx0IiwgImFwcHMiIF0KfQ==
+    # base64 of:
+    # {
+    #   "token": "abcdef12345",
+    #   "namespaces": ["default", "apps"]
+    # }
+```
+
+> **Note:** All values must be base64-encoded.
+
+---
+
+## 🖥️ Adding Remote Clusters via CLI
+
+Instead of using secrets manually, you can automatically add a cluster using:
+
+```bash
+argocd cluster add <kube-context-name>
+```
+
+Where `<kube-context-name>` is present in your local `~/.kube/config`.
+
+Example:
+
+```bash
+argocd cluster add dev-cluster-context
+```
+
+This command automatically creates the secret with proper configurations.
+
+---
+
+## 🔍 Verification
+
+Check registered clusters:
+
+```bash
+argocd cluster list
+```
+
+---
+
+## 💡 Best Practices
+
+✔ Use **Service Accounts + RBAC** for secure authentication
+✔ Limit access using `namespaces` where possible
+✔ Prefer **cloud IAM auth** for production
+✔ Avoid storing raw tokens in plaintext repos
+
+---
+
+## 📎 Summary
+
+* Argo CD deploys apps to local and remote clusters.
+* Remote clusters must be added using secrets or CLI.
+* Secrets require specific labels and authentication configuration.
+* Multiple auth methods exist depending on security needs.

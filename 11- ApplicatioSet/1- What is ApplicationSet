@@ -1,0 +1,207 @@
+# **ApplicationSet in Argo CD — Complete Documentation**
+
+## **Introduction**
+
+ApplicationSet is a powerful **controller** and **Custom Resource Definition (CRD)** in Argo CD designed to automate the creation, management, and updating of Argo CD `Application` resources. It enables scalable GitOps workflows, especially for organizations that manage **multiple Kubernetes clusters**, **multiple applications**, or **multi-tenant environments**.
+
+ApplicationSet simplifies large deployments by allowing you to define templates that dynamically generate many Argo CD Applications from a single manifest.
+
+---
+
+# **What is ApplicationSet?**
+
+ApplicationSet is composed of:
+
+1. **ApplicationSet CRD** – the Kubernetes custom resource where you define templates and generators.
+2. **ApplicationSet Controller** – a controller that reads the ApplicationSet CRD and creates/updates/deletes Argo CD Application resources accordingly.
+
+It offers major features:
+
+* Automatically generate Argo CD Applications.
+* Dynamically manage applications across multiple clusters.
+* Simplify GitOps operations in multi-tenant environments.
+* Provide self-service application deployment for developers.
+
+---
+
+# **Why Use ApplicationSet?**
+
+## **1. Multi-cluster Application Deployment**
+
+You can define **one Kubernetes manifest** that deploys **a single application** to **multiple clusters**.
+Example: Deploying `guestbook` to all production clusters.
+
+## **2. Multi-application Deployment**
+
+You can define **one manifest** to deploy **multiple applications** into:
+
+* one cluster, or
+* several clusters.
+
+Example use case:
+An infrastructure team can deploy cluster add-ons (Prometheus, Ingress controller, Argo Workflows, etc.) across all clusters automatically.
+
+## **3. Improved Multi-Tenancy**
+
+Developers can deploy services into their own:
+
+* cluster, or
+* namespace
+
+…without requiring cluster-admin involvement.
+ApplicationSet automates the creation of application manifests based on templates and parameters, enabling safe self-service.
+
+---
+
+# **How ApplicationSet Works (Controller Flow)**
+
+Understanding the separation of responsibilities is important:
+
+### **ApplicationSet Controller**
+
+* Creates Argo CD **Application** manifests (YAML objects) inside the Argo CD namespace.
+* Updates them when templates or parameters change.
+* Deletes them when they are no longer needed.
+
+It **does NOT** apply or modify resources in the destination clusters.
+
+### **Application Controller**
+
+* Argo CD’s Application Controller applies the Kubernetes resources inside the destination cluster.
+* It performs the actual sync, health checks, and drift detection.
+
+### **Flow Diagram (Conceptual)**
+
+```
+ApplicationSet CRD  
+       │
+       ▼
+ApplicationSet Controller → generates Argo CD Application objects
+       │
+       ▼
+Application Controller → applies manifests to destination clusters
+```
+
+---
+
+# **ApplicationSet YAML Structure**
+
+An ApplicationSet manifest looks similar to an Argo CD Application, but with additional logic.
+
+### **Key sections:**
+
+* **kind:** `ApplicationSet`
+* **metadata:** name and labels
+* **spec.template:** defines how each generated Application should look
+* **spec.generators:** defines how parameters are created for each application instance
+
+### **Template Structure**
+
+The `template` section contains an embedded Application manifest.
+
+Example:
+
+```yaml
+spec:
+  template:
+    metadata:
+      name: '{{cluster}}-guestbook'
+    spec:
+      destination:
+        server: '{{url}}'
+      source:
+        repoURL: https://github.com/example/repo
+        path: '{{path}}'
+```
+
+Here we use dynamic placeholders such as:
+
+* `{{cluster}}`
+* `{{url}}`
+* `{{path}}`
+
+These variables come from **generators**.
+
+---
+
+# **Generators**
+
+Generators produce the parameters that ApplicationSet renders into the template.
+They allow you to generate:
+
+* multiple Applications from one manifest
+* dynamic Application names
+* dynamic cluster destinations
+* different source paths
+  … and more.
+
+A generator feeds data into the template.
+
+## **Example: List Generator**
+
+A simple example where you manually define a list of clusters:
+
+```yaml
+spec:
+  generators:
+  - list:
+      elements:
+      - cluster: engineering-prod-1
+        url: https://prod1.example.com
+      - cluster: engineering-prod-2
+        url: https://prod2.example.com
+```
+
+The controller will generate **two Applications**, one for each element.
+
+### **Rendered Application names:**
+
+* `engineering-prod-1-guestbook`
+* `engineering-prod-2-guestbook`
+
+### **Rendered destinations:**
+
+* `server: https://prod1.example.com`
+* `server: https://prod2.example.com`
+
+## **Generator Concept Summary**
+
+* Generators provide data.
+* Templates consume that data.
+* ApplicationSet renders one Argo CD Application per generator element.
+
+### **Types of Generators** (not all, but common)
+
+* **List generator**
+* **Cluster generator** (pulls clusters from Argo CD)
+* **Git generator**
+* **Matrix generator**
+* **SCM provider generator**
+  …and more (will be explored in later sections).
+
+---
+
+# **Installing ApplicationSet Controller**
+
+### **Argo CD v2.3 and above**
+
+* **ApplicationSet is installed by default.**
+* No extra steps needed.
+
+### **Argo CD versions prior to v2.3**
+
+* You must install ApplicationSet using its specific installation manifests.
+* Available in the Argo CD project GitHub repository.
+
+---
+
+# **Summary**
+
+ApplicationSet is a key component of modern GitOps with Argo CD, providing:
+
+* automated generation of Argo CD Applications,
+* scalable multi-cluster and multi-application deployments,
+* improved multi-tenancy and self-service,
+* support for dynamic parameter generation through generators.
+
+It works by generating Application objects, while the standard Argo CD Application Controller handles applying Kubernetes resources to destination clusters.

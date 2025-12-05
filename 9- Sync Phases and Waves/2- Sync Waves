@@ -1,0 +1,133 @@
+# **Argo CD Sync Waves – Detailed Documentation**
+
+## **Overview**
+
+In Argo CD, Sync Waves provide a mechanism to control the deployment order of Kubernetes manifests **within the same sync phase**. While Sync Phases (`PreSync`, `Sync`, `PostSync`) define *when* resources are applied, Sync Waves allow finer-grained control by specifying the *order* in which resources are deployed **within each phase**.
+
+This becomes useful when certain resources must be created or become healthy **before** others, even if they belong to the same phase.
+Example: Deploy backend before frontend, or apply ConfigMaps before deploying workloads.
+
+---
+
+## **Default Behavior**
+
+* By default, **all resources are deployed in Wave `0`**.
+* Without custom wave configuration, all manifests in a phase are applied together.
+
+---
+
+## **How Sync Waves Work**
+
+You can explicitly assign a **wave number** to any resource using an annotation.
+Argo CD processes waves in **ascending numeric order**, meaning:
+
+```
+Wave -5  →  Wave -1  →  Wave 0 (default)  →  Wave 1  →  Wave 5 ...
+```
+
+### Key Rules:
+
+1. **Supports positive and negative integers**
+2. **Lower numbers sync first**
+3. **Next wave starts only after all resources in the current wave are**:
+   ✔ Synced
+   ✔ Healthy (if health check is supported)
+4. Argo CD introduces a **default delay of ~2 seconds** between waves
+
+---
+
+## **Sync Flow**
+
+The following sequence is always respected:
+
+1. **Process phases in order:**
+
+   1. `PreSync`
+   2. `Sync`
+   3. `PostSync`
+
+2. **Within each phase:**
+
+   * Resources are grouped into waves
+   * Argo CD applies waves from lowest to highest
+   * All resources in a wave must reach a healthy state before continuing
+
+3. **Within each wave:**
+   Argo CD orders resources based on:
+
+   1. **Resource kind priority**
+
+      * Example priority sequence: `Namespace` → `NetworkPolicy` → `ResourceQuota` → `ConfigMap` → `Deployment` → …
+   2. **Alphabetical resource name**
+
+---
+
+## **Setting Sync Waves**
+
+Sync waves are assigned using the following annotation:
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "<wave-number>"
+```
+
+### Example: ConfigMap → Backend → Frontend
+
+| Resource            | Wave |
+| ------------------- | ---- |
+| ConfigMap           | 0    |
+| Backend Deployment  | 1    |
+| Frontend Deployment | 2    |
+
+---
+
+### **Example Manifest (wave -1 in PreSync phase)**
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-phase: "PreSync"
+```
+
+This ensures the job runs **before all other resources** within the PreSync phase.
+
+---
+
+## **Practical Use Cases**
+
+| Use Case                                       | Example                        |
+| ---------------------------------------------- | ------------------------------ |
+| Apply config/resources before workloads        | ConfigMap, Secret → Deployment |
+| Backend dependency readiness                   | Backend → Frontend             |
+| Running database migrations early              | Migration job in early wave    |
+| Multi-cluster or distributed component rollout | Core services first            |
+
+---
+
+## **Important Notes**
+
+* If a resource in a wave **fails** or is **unhealthy**, Argo CD **stops** and will not continue to the next wave.
+* Waves do **not** replace phases — they refine behavior **inside phases**.
+* Incorrect wave ordering can cause dependency issues, so design carefully.
+
+---
+
+## **Summary**
+
+| Feature                       | Sync Phase                | Sync Wave |
+| ----------------------------- | ------------------------- | --------- |
+| Controls *when* resources run | ✔                         | ❌         |
+| Controls *order inside phase* | ❌                         | ✔         |
+| Default value                 | PreSync → Sync → PostSync | Wave 0    |
+| Supports negative values      | —                         | ✔         |
+
+---
+
+## **Final Statement**
+
+Sync Waves in Argo CD provide flexible, deterministic, dependency-aware ordering for Kubernetes resource deployments, enabling controlled sequencing within each sync phase while ensuring that health checks are respected before progressing.

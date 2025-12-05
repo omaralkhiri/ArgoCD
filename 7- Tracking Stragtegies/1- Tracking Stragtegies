@@ -1,0 +1,158 @@
+# **Argo CD Tracking Strategies – Detailed Documentation**
+
+Argo CD supports multiple strategies for tracking and deploying application manifests stored in Git repositories or Helm repositories. Choosing the right tracking strategy depends on your environment (development, staging, production) and the level of control and stability required.
+
+---
+
+## **1. Tracking Strategies for Git Repositories**
+
+When working with Git-based manifests (Kustomize, raw YAML, Helm chart stored in Git), Argo CD can track versions in several ways:
+
+### **a. Commit SHA (Most Restrictive - Production Recommended)**
+
+You can lock your application to a specific commit hash (full or short SHA).
+This ensures **full immutability and predictability**.
+
+Example configuration:
+
+```yaml
+spec:
+  source:
+    repoURL: https://github.com/example/app-config.git
+    targetRevision: f9d4c9a
+```
+
+**Use case**: Production workloads that require deterministic deployments.
+
+---
+
+### **b. Git Tags (Stable and Recommended for Production)**
+
+Tags are good alternatives to SHAs as they generally represent **stable release points** and do not change frequently.
+
+Example:
+
+```yaml
+spec:
+  source:
+    repoURL: https://github.com/example/app-config.git
+    targetRevision: v1.2.0
+```
+
+**Use case**: Production and staging environments.
+
+---
+
+### **c. Git Branches (Dynamic - Recommended for Dev/Test)**
+
+You may track branches such as `main`, `dev`, or `feature/new-ui`.
+
+```yaml
+spec:
+  source:
+    repoURL: https://github.com/example/app-config.git
+    targetRevision: main
+```
+
+**Use case**: Continuous deployment in development environments.
+
+---
+
+### **d. Symbolic References (e.g., `HEAD`)**
+
+Argo CD can track symbolic references like `HEAD`.
+If the symbolic reference resolves to a different commit, Argo CD detects the change and triggers synchronization.
+
+Example:
+
+```yaml
+spec:
+  source:
+    repoURL: https://github.com/example/app-config.git
+    targetRevision: HEAD
+```
+
+**Use case**: Only for development or dynamic pipelines, not recommended for production.
+
+---
+
+## **2. Tracking Strategies for Helm Repositories**
+
+When Argo CD pulls charts directly from a Helm repository, Helm uses **semantic versioning (SemVer)** conventions. There are three main ways to track chart versions:
+
+### **a. Specific Helm Chart Version**
+
+Locks the deployment to an exact version.
+
+```yaml
+spec:
+  source:
+    repoURL: https://charts.example.com
+    chart: myapp
+    targetRevision: 3.1.2
+```
+
+**Use case**: Production and regulated environments.
+
+---
+
+### **b. Helm Version Ranges**
+
+You can define version ranges to automatically adopt the latest version within allowed boundaries.
+
+Example:
+
+```yaml
+spec:
+  source:
+    repoURL: https://charts.example.com
+    chart: myapp
+    targetRevision: ">3.0.0 <4.1.0"
+```
+
+Result: Argo CD automatically selects the latest version within the specified range.
+
+**Use case**: Staging or controlled environments with safe automated upgrades.
+
+---
+
+### **c. Latest Version (Wildcard `*`)**
+
+Tracks the newest chart version automatically.
+
+Example:
+
+```yaml
+spec:
+  source:
+    repoURL: https://charts.example.com
+    chart: myapp
+    targetRevision: "*"
+```
+
+**Use case**: Experimental or development environments.
+
+---
+
+## **Summary Table**
+
+| Strategy Type         | Example         | Stability Level | Recommended Environment           |
+| --------------------- | --------------- | --------------- | --------------------------------- |
+| Commit SHA            | `f9d4c9a`       | ★★★★★           | Production                        |
+| Git Tag               | `v1.2.0`        | ★★★★☆           | Production / Staging              |
+| Git Branch            | `main`          | ★★☆☆☆           | Dev / Feature Testing             |
+| Symbolic Reference    | `HEAD`          | ★★☆☆☆           | Development Only                  |
+| Helm Specific Version | `3.1.2`         | ★★★★★           | Production                        |
+| Helm Version Range    | `>3.0.0 <4.1.0` | ★★★★☆           | Staging / Controlled Auto Updates |
+| Helm Wildcard         | `*`             | ★☆☆☆☆           | Dev / Experiments                 |
+
+---
+
+## **Best Practices**
+
+✔ Prefer **commit SHA** or **tags** for production
+✔ Automate builds and tagging in CI/CD pipelines
+✔ Validate new Helm chart versions before promotion
+✔ Use version ranges with caution
+✔ Enable Argo CD sync policies wisely (manual vs. automated)
+

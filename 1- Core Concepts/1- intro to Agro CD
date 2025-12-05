@@ -1,0 +1,156 @@
+# **Argo CD: GitOps Continuous Delivery for Kubernetes**
+
+## **Overview**
+
+Argo CD is a **GitOps continuous delivery (CD) tool** designed for Kubernetes.
+It automates the deployment process by continuously monitoring your application manifests stored in a Git repository and synchronizing them with your Kubernetes clusters.
+
+In simple terms, Argo CD ensures that the **desired state** (stored in Git) always matches the **actual state** (running in your cluster).
+
+---
+
+## **Is Argo CD a CI Tool?**
+
+No — **Argo CD is not a CI (Continuous Integration) tool**.
+A CI tool is responsible for:
+
+* Building source code
+* Running unit tests
+* Creating container images
+* Pushing images to a container registry (e.g., Docker Hub, Artifactory)
+
+Common CI tools include:
+
+* GitLab CI
+* GitHub Actions
+* Azure Pipelines
+* Jenkins
+
+Argo CD’s role begins **after** these steps — it handles the deployment process based on the manifests in Git.
+
+---
+
+## **Traditional CD Approach**
+
+Traditional CI/CD tools typically implement a **push model**.
+Here’s how the process works:
+
+1. **Build and Test**
+
+   * The CI system builds the code and runs unit tests.
+
+2. **Image Creation**
+
+   * The CI pipeline builds a Docker image and pushes it to a registry.
+
+3. **Update Kubernetes Manifests**
+
+   * The deployment YAML or Helm chart in Git is updated with the new image tag.
+
+4. **Deployment to Kubernetes**
+
+   * The CD step uses `kubectl` or `helm` CLI commands to apply the changes directly to the cluster.
+
+### **Limitations of the Push Model**
+
+1. **Cluster Access**
+
+   * The CI/CD agent must have access to the target Kubernetes cluster.
+
+2. **Security Risks**
+
+   * Cluster credentials (e.g., `kubeconfig`) must be stored in the CI/CD system.
+
+3. **Network Connectivity**
+
+   * You must open network access between your CI/CD system and the cluster — introducing security concerns.
+
+---
+
+## **Argo CD (GitOps) Approach**
+
+Argo CD uses a **pull-based model** that eliminates the above security and connectivity issues.
+
+### **Workflow**
+
+1. **CI Responsibilities**
+
+   * Build and test the code.
+   * Build and push Docker images.
+   * Update the configuration (manifest) repository with the new image tag.
+
+2. **CD Responsibilities**
+
+   * Argo CD monitors the configuration repository for any changes.
+   * When a new commit (e.g., a new image tag) is detected, Argo CD automatically synchronizes the cluster to match the new desired state.
+
+### **How It Works**
+
+* Suppose version `1.0` of your application is deployed.
+* The CI pipeline builds version `1.1`, pushes it to the registry, and updates the manifest repo with tag `1.1`.
+* Argo CD detects that the cluster (still running `1.0`) is **Out of Sync** with Git.
+* It then deploys the new version automatically.
+* Once complete, the application status becomes **Synced**.
+
+---
+
+## **Benefits of Using Argo CD**
+
+### **1. Visibility and Observability**
+
+Argo CD provides real-time visibility into:
+
+* Sync status (Synced / Out of Sync)
+* Application health
+* Deployment history
+* Live updates of Kubernetes resources (Pods, Deployments, Services, etc.)
+
+### **2. Git as the Source of Truth**
+
+Argo CD follows the GitOps principle — all application manifests are stored in Git.
+Developers and DevOps engineers only need to update Git, not interact directly with the cluster.
+
+### **3. Easy Rollbacks**
+
+To revert to a previous state, simply **revert a Git commit**.
+Argo CD will detect the change and automatically restore the previous version.
+
+### **4. Enhanced Security**
+
+* Only Argo CD requires deployment access to the cluster.
+* CI/CD agents and external users do not need cluster credentials.
+
+### **5. Disaster Recovery**
+
+In case of a new or restored cluster, Argo CD can redeploy all applications simply by pointing it to the same configuration repositories.
+
+---
+
+## **Best Practices**
+
+* Maintain **separate repositories**:
+
+  * One for application source code.
+  * One for configuration/manifests (the GitOps repo).
+* Use **Argo CD Application** objects to track individual deployments.
+* Enable **auto-sync** for hands-free continuous delivery.
+* Regularly monitor application health and sync status in the Argo CD UI.
+
+---
+
+## **Summary**
+
+| **Traditional CD (Push Model)**         | **Argo CD (Pull Model)**                      |
+| --------------------------------------- | --------------------------------------------- |
+| CI/CD agent deploys to cluster directly | Argo CD deploys from within the cluster       |
+| Requires external cluster access        | No external access required                   |
+| Harder to track deployment state        | Full visibility and sync status               |
+| CI/CD handles both CI and CD            | CI handles builds; Argo CD handles deployment |
+| Manual rollback or re-run needed        | Rollback by reverting a Git commit            |
+
+---
+
+## **Conclusion**
+
+Argo CD modernizes the deployment process by implementing the **GitOps model**.
+It keeps your clusters in sync with your Git repositories, provides real-time visibility, simplifies rollbacks, and enhances security — all while separating CI from CD responsibilities.
